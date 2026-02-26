@@ -67,18 +67,19 @@ app.post('/api/calculate', async (c) => {
       const row = jsonData[i]
       const 매체사 = row[1]  // B열
       const 계정명 = row[6]  // G열
-      const 합계금액 = row[9]  // J열
+      const 광고비합계 = row[9]  // J열 (합계금액)
+      const 수수료율 = row[10]  // K열 (수수료율)
 
       // 유효한 데이터만 처리
-      if (매체사 && 계정명 && 합계금액 !== undefined && 합계금액 !== null) {
+      if (매체사 && 계정명 && 광고비합계 !== undefined && 광고비합계 !== null) {
         // '합' 포함된 행과 계정명이 '-'인 행 제외
         if (typeof 매체사 === 'string' && !매체사.includes('합') && 계정명 !== '-') {
-          const 금액 = typeof 합계금액 === 'number' ? 합계금액 : parseFloat(String(합계금액))
+          const 금액 = typeof 광고비합계 === 'number' ? 광고비합계 : parseFloat(String(광고비합계))
+          const 율 = typeof 수수료율 === 'number' ? 수수료율 : parseFloat(String(수수료율))
           
-          if (!isNaN(금액)) {
-            // 정산율 결정: 네이버 성과형 애드부스트는 5%, 나머지는 10%
-            const 정산율 = 매체사.includes('네이버 성과형 애드부스트') ? 0.05 : 0.10
-            const 정산금액 = 금액 * 정산율
+          if (!isNaN(금액) && !isNaN(율)) {
+            // K열의 수수료율을 그대로 사용 (0.14 = 14%, 0.09 = 9%)
+            const 정산금액 = 금액 * 율
 
             rows.push({
               매체사: 매체사,
