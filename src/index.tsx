@@ -68,18 +68,30 @@ app.post('/api/calculate', async (c) => {
       const 매체사 = row[1]  // B열
       const 계정명 = row[6]  // G열
       const 광고비합계 = row[9]  // J열 (합계금액)
-      const 수수료율 = row[10]  // K열 (수수료율)
+      const K열수수료율 = row[10]  // K열 (수수료율 - 0.14 또는 0.09)
 
       // 유효한 데이터만 처리
       if (매체사 && 계정명 && 광고비합계 !== undefined && 광고비합계 !== null) {
         // '합' 포함된 행과 계정명이 '-'인 행 제외
         if (typeof 매체사 === 'string' && !매체사.includes('합') && 계정명 !== '-') {
           const 금액 = typeof 광고비합계 === 'number' ? 광고비합계 : parseFloat(String(광고비합계))
-          const 율 = typeof 수수료율 === 'number' ? 수수료율 : parseFloat(String(수수료율))
+          const K열율 = typeof K열수수료율 === 'number' ? K열수수료율 : parseFloat(String(K열수수료율))
           
-          if (!isNaN(금액) && !isNaN(율)) {
-            // K열의 수수료율을 그대로 사용 (0.14 = 14%, 0.09 = 9%)
-            const 정산금액 = 금액 * 율
+          if (!isNaN(금액) && !isNaN(K열율)) {
+            // K열 수수료율에 따라 정산율 결정
+            // K열이 0.09 (9%) → 정산은 5%
+            // K열이 0.14 (14%) → 정산은 10%
+            let 정산율: number
+            if (Math.abs(K열율 - 0.09) < 0.001) {
+              정산율 = 0.05  // 5%
+            } else if (Math.abs(K열율 - 0.14) < 0.001) {
+              정산율 = 0.10  // 10%
+            } else {
+              // 예외 케이스: K열이 0.09도 0.14도 아닌 경우 기본 10%
+              정산율 = 0.10
+            }
+            
+            const 정산금액 = 금액 * 정산율
 
             rows.push({
               매체사: 매체사,
