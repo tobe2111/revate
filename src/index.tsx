@@ -63,12 +63,17 @@ app.post('/api/calculate', async (c) => {
     const rows: SettlementRow[] = []
     
     // 2행부터 데이터 추출 (0-based index이므로 2부터 시작)
+    // XLSX는 빈 A열을 생략하므로 인덱스가 1씩 앞당겨집니다
+    // B열(매체사) = 인덱스 0
+    // G열(계정명) = 인덱스 5
+    // J열(합계금액) = 인덱스 8
+    // K열(수수료율) = 인덱스 9
     for (let i = 2; i < jsonData.length; i++) {
       const row = jsonData[i]
-      const 매체사 = row[1]  // B열
-      const 계정명 = row[6]  // G열
-      const 광고비합계 = row[9]  // J열 (합계금액)
-      const K열수수료율 = row[10]  // K열 (수수료율 - 0.14 또는 0.09)
+      const 매체사 = row[0]  // B열 (인덱스 0)
+      const 계정명 = row[5]  // G열 (인덱스 5)
+      const 광고비합계 = row[8]  // J열 (인덱스 8)
+      const K열수수료율 = row[9]  // K열 (인덱스 9)
 
       // 유효한 데이터만 처리
       if (매체사 && 계정명 && 광고비합계 !== undefined && 광고비합계 !== null) {
