@@ -19,7 +19,7 @@
     "@hono/vite-cloudflare-pages": "^0.4.2",
     "@types/node": "^22.10.5",
     "vite": "^6.0.7",
-    "wrangler": "^3.102.0",
+    "wrangler": "^4.68.1",
     "xlsx": "^0.18.5"
   }
 }
