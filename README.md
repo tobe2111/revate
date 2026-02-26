@@ -1,21 +1,154 @@
-```txt
+# 마케팅 정산 계산기
+
+## 프로젝트 개요
+- **이름**: 마케팅 정산 계산기 (Marketing Settlement Calculator)
+- **목적**: 월별 마케팅 정산서 엑셀 파일을 업로드하면 고객사별 정산 금액을 자동으로 계산
+- **주요 기능**:
+  - 엑셀 파일(.xlsx, .xls) 업로드
+  - 고객사 계정명별 정산 금액 자동 계산
+  - 정산율: 기본 10%, 네이버 성과형 애드부스트는 5%
+  - 고객사별 상세 내역 표시
+  - 정산 금액 순위별 정렬
+
+## URLs
+- **샌드박스**: https://3000-if25wspaah39tuxdzmtsf-de59bda9.sandbox.novita.ai
+- **GitHub**: (배포 후 업데이트 예정)
+- **Cloudflare Pages**: (배포 후 업데이트 예정)
+
+## 기능 명세
+
+### 완료된 기능 ✅
+1. **엑셀 파일 업로드 및 파싱**
+   - .xlsx, .xls 형식 지원
+   - B열(매체사), G열(계정명), J열(합계금액) 자동 추출
+
+2. **정산 계산 로직**
+   - 기본 정산율: 10%
+   - 네이버 성과형 애드부스트: 5%
+   - 고객사별 합계 자동 집계
+
+3. **결과 표시**
+   - 전체 광고비 합계 및 전체 정산 금액 표시
+   - 고객사별 순위 표시 (1위: 금, 2위: 은, 3위: 동)
+   - 고객사 클릭 시 상세 내역 표시
+
+4. **상세 내역**
+   - 매체사별 광고비 및 정산율 표시
+   - 정산 금액 자동 계산
+   - 시각적 정산율 배지 (5%: 주황, 10%: 초록)
+
+### 미구현 기능 ⏳
+- 엑셀 파일 다운로드 기능
+- 월별 정산 내역 저장 기능
+- 정산 비교 (전월 대비) 기능
+
+## 데이터 구조
+
+### 입력 데이터 (엑셀)
+- **B열**: 매체사 (예: 네이버 성과형DA, 네이버 쇼핑, 네이버 성과형 애드부스트 등)
+- **G열**: 고객사 계정명 (예: 주식회사 삼십일, 데디투스 등)
+- **J열**: 합계금액 (광고비 총액)
+
+### 출력 데이터
+```typescript
+{
+  summary: [
+    {
+      계정명: string,
+      합계금액: number,
+      정산금액: number,
+      내역: [
+        {
+          매체사: string,
+          합계금액: number,
+          정산금액: number
+        }
+      ]
+    }
+  ],
+  total: {
+    전체광고비: number,
+    전체정산금액: number
+  }
+}
+```
+
+## 사용 방법
+
+### 1. 파일 업로드
+1. "파일 선택" 버튼 클릭
+2. 정산서 엑셀 파일 선택 (.xlsx 또는 .xls)
+3. "파일 업로드 및 계산" 버튼 클릭
+
+### 2. 결과 확인
+- **상단 요약**: 전체 광고비 및 정산 금액 표시
+- **순위 테이블**: 고객사별 정산 금액 순위
+- **상세 내역**: 고객사 클릭 시 매체사별 상세 내역 표시
+
+### 3. 정산 규칙
+- **기본 정산**: 광고비의 10%
+- **애드부스트 정산**: 네이버 성과형 애드부스트는 광고비의 5%
+
+## 기술 스택
+- **백엔드**: Hono (TypeScript)
+- **프론트엔드**: Vanilla JavaScript + Tailwind CSS (CDN)
+- **파일 처리**: XLSX (SheetJS)
+- **배포**: Cloudflare Pages
+- **프로세스 관리**: PM2
+
+## 배포 상태
+- **샌드박스**: ✅ 활성
+- **GitHub**: ⏳ 준비 중
+- **Cloudflare Pages**: ⏳ 준비 중
+
+## 개발 명령어
+```bash
+# 개발 서버 시작
+npm run dev:sandbox
+
+# 빌드
+npm run build
+
+# 배포
+npm run deploy:prod
+
+# 포트 정리
+npm run clean-port
+
+# 서버 테스트
+npm run test
+```
+
+## 로컬 개발
+```bash
+# 패키지 설치
 npm install
-npm run dev
+
+# 빌드
+npm run build
+
+# PM2로 서버 시작
+pm2 start ecosystem.config.cjs
+
+# 서버 확인
+curl http://localhost:3000
+
+# 로그 확인
+pm2 logs marketing-settlement --nostream
 ```
 
-```txt
-npm run deploy
-```
+## 다음 단계
+1. ✅ 기본 기능 구현 완료
+2. ⏳ GitHub 저장소에 푸시
+3. ⏳ Cloudflare Pages 배포
+4. ⏳ 추가 기능 구현 (엑셀 다운로드, 내역 저장 등)
 
-[For generating/synchronizing types based on your Worker configuration run](https://developers.cloudflare.com/workers/wrangler/commands/#types):
+## 정확도 보장
+- 모든 계산은 소수점 둘째 자리까지 정확하게 표시
+- 실적보정(음수 값) 정확하게 반영
+- 매체사별 정산율 자동 적용 (오차 없음)
 
-```txt
-npm run cf-typegen
-```
-
-Pass the `CloudflareBindings` as generics when instantiation `Hono`:
-
-```ts
-// src/index.ts
-const app = new Hono<{ Bindings: CloudflareBindings }>()
-```
+## 마지막 업데이트
+- **날짜**: 2026-02-26
+- **버전**: 1.0.0
+- **상태**: 개발 완료, 배포 준비 중
