@@ -160,10 +160,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function formatNumber(num) {
     if (typeof num !== 'number') return '0'
-    return num.toLocaleString('ko-KR', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
-    })
+    // 소숫점 절삭 (Math.floor)
+    return Math.floor(num).toLocaleString('ko-KR')
   }
 
   function getRankClass(rank) {
