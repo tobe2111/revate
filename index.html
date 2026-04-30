@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>마케팅 정산 계산기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen py-8 px-4">
+        <div class="max-w-6xl mx-auto">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <div class="flex items-center mb-6">
+                    <i class="fas fa-calculator text-3xl text-blue-600 mr-3"></i>
+                    <h1 class="text-3xl font-bold text-gray-800">마케팅 정산 계산기</h1>
+                </div>
+
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+                    <p class="text-sm text-gray-700">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        엑셀 파일을 업로드하면 고객사별 정산 금액을 자동으로 계산합니다.
+                    </p>
+                </div>
+
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                    <h2 class="text-sm font-semibold text-gray-700 mb-3">
+                        <i class="fas fa-sliders-h mr-2"></i>정산율 설정
+                    </h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">
+                                수수료율 <span class="font-bold text-purple-700">9%</span> 적용 정산율 (%)
+                            </label>
+                            <input type="number" id="rate9Input" value="5" min="0" max="100" step="0.1"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">
+                                수수료율 <span class="font-bold text-blue-700">14%</span> 적용 정산율 (%)
+                            </label>
+                            <input type="number" id="rate14Input" value="10" min="0" max="100" step="0.1"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-file-excel mr-2"></i>엑셀 파일 선택
+                    </label>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls"
+                           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                </div>
+
+                <button id="uploadBtn"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center">
+                    <i class="fas fa-upload mr-2"></i>파일 업로드 및 계산
+                </button>
+
+                <div id="loading" class="hidden text-center py-8">
+                    <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i>
+                    <p class="text-gray-600">계산 중...</p>
+                </div>
+
+                <div id="error" class="hidden mt-6 bg-red-50 border-l-4 border-red-500 p-4">
+                    <p class="text-red-700"></p>
+                </div>
+            </div>
+
+            <div id="results" class="hidden">
+                <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">
+                        <i class="fas fa-chart-bar mr-2"></i>정산 결과
+                    </h2>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
+                            <p class="text-sm opacity-90 mb-1">전체 광고비</p>
+                            <p class="text-3xl font-bold" id="totalAdCost">0원</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white">
+                            <p class="text-sm opacity-90 mb-1">전체 정산 금액</p>
+                            <p class="text-3xl font-bold" id="totalSettlement">0원</p>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">순위</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">고객사 계정명</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">광고비 합계</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">정산 금액</th>
+                                </tr>
+                            </thead>
+                            <tbody id="summaryTableBody" class="bg-white divide-y divide-gray-200">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="detailsCard" class="hidden bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">
+                        <i class="fas fa-list mr-2"></i>상세 내역
+                    </h3>
+                    <div id="detailsContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const results = document.getElementById('results');
+
+        uploadBtn.addEventListener('click', handleUpload);
+
+        async function handleUpload() {
+            const file = fileInput.files[0];
+            if (!file) {
+                showError('파일을 선택해주세요.');
+                return;
+            }
+
+            if (!file.name.match(/\.(xlsx|xls)$/)) {
+                showError('엑셀 파일(.xlsx, .xls)만 업로드 가능합니다.');
+                return;
+            }
+
+            const rate9Val = parseFloat(document.getElementById('rate9Input').value);
+            const rate14Val = parseFloat(document.getElementById('rate14Input').value);
+
+            if (isNaN(rate9Val) || rate9Val < 0 || rate9Val > 100) {
+                showError('수수료율 9% 정산율은 0~100 사이의 값을 입력해주세요.');
+                return;
+            }
+            if (isNaN(rate14Val) || rate14Val < 0 || rate14Val > 100) {
+                showError('수수료율 14% 정산율은 0~100 사이의 값을 입력해주세요.');
+                return;
+            }
+
+            const customRate9 = rate9Val / 100;
+            const customRate14 = rate14Val / 100;
+
+            error.classList.add('hidden');
+            results.classList.add('hidden');
+            loading.classList.remove('hidden');
+            uploadBtn.disabled = true;
+
+            try {
+                const data = await file.arrayBuffer();
+                const workbook = XLSX.read(data, { type: 'array' });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                const calculatedData = calculateSettlement(jsonData, customRate9, customRate14);
+                displayResults(calculatedData);
+            } catch (err) {
+                showError('파일 처리 중 오류가 발생했습니다: ' + err.message);
+            } finally {
+                loading.classList.add('hidden');
+                uploadBtn.disabled = false;
+            }
+        }
+
+        function calculateSettlement(rows, customRate9, customRate14) {
+            const accountMap = new Map();
+
+            for (let i = 3; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row || row.length < 10) continue;
+
+                const media = row[0];
+                const accountName = row[5];
+                const amount = parseFloat(row[8]);
+                const feeRate = parseFloat(row[9]);
+
+                if (!media || !accountName || accountName === '-' ||
+                    isNaN(amount) || isNaN(feeRate)) continue;
+                if (typeof media === 'string' && media.includes('합')) continue;
+
+                let settlementRate = customRate14;
+                if (Math.abs(feeRate - 0.09) < 0.001) {
+                    settlementRate = customRate9;
+                }
+
+                const settlement = amount * settlementRate;
+
+                if (!accountMap.has(accountName)) {
+                    accountMap.set(accountName, {
+                        accountName,
+                        totalAmount: 0,
+                        totalSettlement: 0,
+                        details: []
+                    });
+                }
+
+                const account = accountMap.get(accountName);
+                account.totalAmount += amount;
+                account.totalSettlement += settlement;
+                account.details.push({
+                    media,
+                    amount,
+                    settlementRate: settlementRate * 100,
+                    settlement
+                });
+            }
+
+            const accounts = Array.from(accountMap.values())
+                .sort((a, b) => b.totalSettlement - a.totalSettlement);
+
+            const totalAdCost = accounts.reduce((sum, acc) => sum + acc.totalAmount, 0);
+            const totalSettlement = accounts.reduce((sum, acc) => sum + acc.totalSettlement, 0);
+
+            return { accounts, totalAdCost, totalSettlement };
+        }
+
+        function displayResults(data) {
+            document.getElementById('totalAdCost').textContent =
+                Math.floor(data.totalAdCost).toLocaleString('ko-KR') + '원';
+            document.getElementById('totalSettlement').textContent =
+                Math.floor(data.totalSettlement).toLocaleString('ko-KR') + '원';
+
+            const tbody = document.getElementById('summaryTableBody');
+            tbody.innerHTML = '';
+
+            data.accounts.forEach((account, index) => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 cursor-pointer';
+                row.onclick = () => showDetails(account);
+
+                const rankClass = index === 0 ? 'text-yellow-600 font-bold' :
+                                index === 1 ? 'text-gray-400 font-bold' :
+                                index === 2 ? 'text-orange-600 font-bold' : '';
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="${rankClass}">${index + 1}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                        ${escapeHtml(account.accountName)}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-gray-900">
+                        ${Math.floor(account.totalAmount).toLocaleString('ko-KR')}원
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right font-bold text-green-600">
+                        ${Math.floor(account.totalSettlement).toLocaleString('ko-KR')}원
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            results.classList.remove('hidden');
+            if (data.accounts.length > 0) {
+                showDetails(data.accounts[0]);
+            }
+        }
+
+        function showDetails(account) {
+            const detailsCard = document.getElementById('detailsCard');
+            const detailsContent = document.getElementById('detailsContent');
+
+            let html = `
+                <div class="mb-4">
+                    <h4 class="text-lg font-bold text-gray-800">${escapeHtml(account.accountName)}</h4>
+                    <p class="text-sm text-gray-600">총 광고비: ${Math.floor(account.totalAmount).toLocaleString('ko-KR')}원</p>
+                    <p class="text-sm font-bold text-green-600">총 정산액: ${Math.floor(account.totalSettlement).toLocaleString('ko-KR')}원</p>
+                </div>
+                <div class="space-y-2">
+            `;
+
+            account.details.forEach(detail => {
+                const badgeColor = detail.settlementRate === parseFloat(document.getElementById('rate9Input').value)
+                    ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800';
+                html += `
+                    <div class="border rounded-lg p-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-medium text-gray-800">${escapeHtml(detail.media)}</span>
+                            <span class="px-3 py-1 rounded-full text-xs font-bold ${badgeColor}">
+                                ${detail.settlementRate}%
+                            </span>
+                        </div>
+                        <div class="text-sm text-gray-600">
+                            <p>광고비: ${Math.floor(detail.amount).toLocaleString('ko-KR')}원</p>
+                            <p class="font-bold text-green-600">정산액: ${Math.floor(detail.settlement).toLocaleString('ko-KR')}원</p>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            detailsContent.innerHTML = html;
+            detailsCard.classList.remove('hidden');
+        }
+
+        function showError(message) {
+            error.querySelector('p').textContent = message;
+            error.classList.remove('hidden');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
