@@ -22,7 +22,7 @@
                 <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
                     <p class="text-sm text-gray-700">
                         <i class="fas fa-info-circle mr-2"></i>
-                        엑셀 파일을 업로드하면 고객사별 수수료율과 정산율을 설정한 뒤 금액을 계산합니다.
+                        엑셀 파일을 업로드하면 고객사 · 매체사별 정산율을 설정한 뒤 금액을 계산합니다.
                     </p>
                 </div>
 
@@ -71,11 +71,11 @@
                 </div>
             </div>
 
-            <!-- 2단계: 회사별 수수료율 / 정산율 설정 -->
+            <!-- 2단계: 매체사별 정산율 설정 -->
             <div id="companyRatesSection" class="hidden bg-white rounded-lg shadow-lg p-6 mb-6">
                 <div class="flex items-center justify-between mb-2">
                     <h2 class="text-xl font-bold text-gray-800">
-                        <i class="fas fa-building mr-2"></i>고객사별 수수료율 · 정산율 설정
+                        <i class="fas fa-building mr-2"></i>고객사 · 매체사별 정산율 설정
                     </h2>
                     <button id="resetRatesBtn"
                             class="text-sm text-gray-500 hover:text-blue-600 border border-gray-300 hover:border-blue-400 rounded px-3 py-1 transition">
@@ -83,15 +83,16 @@
                     </button>
                 </div>
                 <p class="text-sm text-gray-500 mb-4">
-                    수수료율을 입력하면 정산율이 자동으로 채워집니다. 정산율은 직접 수정도 가능합니다.
+                    매체사별로 정산율을 개별 설정하세요. 수수료율은 엑셀에서 읽어온 값입니다.
                 </p>
 
                 <div class="overflow-x-auto mb-6">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">고객사 계정명</th>
-                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-36">수수료율 (%)</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">고객사</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">매체사</th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-32">수수료율</th>
                                 <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-36">정산율 (%)</th>
                             </tr>
                         </thead>
@@ -131,8 +132,6 @@
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">순위</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">고객사 계정명</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">광고비 합계</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">수수료율</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">정산율</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">정산 금액</th>
                                 </tr>
                             </thead>
@@ -164,8 +163,9 @@
         const companyRatesSection = document.getElementById('companyRatesSection');
 
         let parsedRows = null;
-        // Map<companyName, { dominantFeeRate: number }>
-        let companyMeta = new Map();
+        // Map<rowKey, { accountName, media, feeRatePct, defaultSettlePct }>
+        // rowKey = `${accountName}|||${media}`
+        let rowMeta = new Map();
 
         analyzeBtn.addEventListener('click', handleAnalyze);
         calculateBtn.addEventListener('click', handleCalculate);
@@ -202,8 +202,8 @@
                 const worksheet = workbook.Sheets[workbook.SheetNames[0]];
                 parsedRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-                companyMeta = buildCompanyMeta(parsedRows);
-                renderCompanyRatesTable(companyMeta, rate9Val, rate14Val);
+                rowMeta = buildRowMeta(parsedRows, rate9Val, rate14Val);
+                renderTable(rowMeta);
                 companyRatesSection.classList.remove('hidden');
             } catch (err) {
                 showError('파일 처리 중 오류가 발생했습니다: ' + err.message);
@@ -213,108 +213,95 @@
             }
         }
 
-        // 각 회사의 지배적 수수료율(엑셀 기준)만 추출
-        function buildCompanyMeta(rows) {
-            const raw = new Map();
+        function makeKey(accountName, media) {
+            return accountName + '|||' + media;
+        }
+
+        // 고객사 + 매체사 조합별로 수수료율(엑셀값) 추출
+        function buildRowMeta(rows, rate9Val, rate14Val) {
+            const meta = new Map();
 
             for (let i = 3; i < rows.length; i++) {
                 const row = rows[i];
                 if (!row || row.length < 10) continue;
                 const media = row[0];
-                const accountName = row[5];
+                const accountName = row[1];
                 const amount = parseFloat(row[8]);
                 const feeRate = parseFloat(row[9]);
                 if (!media || !accountName || accountName === '-' ||
                     isNaN(amount) || isNaN(feeRate)) continue;
                 if (typeof media === 'string' && media.includes('합')) continue;
 
-                if (!raw.has(accountName)) {
-                    raw.set(accountName, { amount9: 0, amount14: 0 });
-                }
-                const m = raw.get(accountName);
-                if (Math.abs(feeRate - 0.09) < 0.001) {
-                    m.amount9 += amount;
-                } else {
-                    m.amount14 += amount;
-                }
+                const key = makeKey(accountName, media);
+                if (meta.has(key)) continue;
+
+                const feeRatePct = Math.round(feeRate * 100);
+                const defaultSettlePct = Math.abs(feeRate - 0.09) < 0.001 ? rate9Val : rate14Val;
+                meta.set(key, { accountName, media, feeRatePct, defaultSettlePct });
             }
 
-            const result = new Map();
-            for (const [company, { amount9, amount14 }] of raw) {
-                result.set(company, { dominantFeeRate: amount9 >= amount14 ? 9 : 14 });
-            }
-            return result;
+            return meta;
         }
 
-        function getSettlementRate(feeRateVal, rate9Val, rate14Val) {
-            if (Math.abs(feeRateVal - 9) < 0.001) return rate9Val;
-            if (Math.abs(feeRateVal - 14) < 0.001) return rate14Val;
-            return '';
-        }
-
-        function renderCompanyRatesTable(meta, rate9Val, rate14Val) {
+        function renderTable(meta) {
             const tbody = document.getElementById('companyRatesBody');
             tbody.innerHTML = '';
 
-            for (const [company, { dominantFeeRate }] of meta) {
+            let prevAccount = null;
+
+            for (const [key, { accountName, media, feeRatePct, defaultSettlePct }] of meta) {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-gray-50';
 
-                // 고객사명
-                const nameTd = document.createElement('td');
-                nameTd.className = 'px-4 py-3 text-sm font-medium text-gray-800';
-                nameTd.textContent = company;
+                // 고객사명 (같은 회사 연속이면 흐리게)
+                const accountTd = document.createElement('td');
+                accountTd.className = 'px-4 py-2.5 text-sm';
+                if (accountName !== prevAccount) {
+                    accountTd.className += ' font-semibold text-gray-800 border-t-2 border-gray-100';
+                    accountTd.textContent = accountName;
+                    prevAccount = accountName;
+                } else {
+                    accountTd.className += ' text-gray-400';
+                    accountTd.textContent = '↳';
+                }
 
-                // 수수료율 입력
+                // 매체사명
+                const mediaTd = document.createElement('td');
+                mediaTd.className = 'px-4 py-2.5 text-sm text-gray-700';
+                mediaTd.textContent = media;
+
+                // 수수료율 (읽기 전용 배지)
                 const feeTd = document.createElement('td');
-                feeTd.className = 'px-4 py-3 text-center';
+                feeTd.className = 'px-4 py-2.5 text-center';
+                const feeBadge = document.createElement('span');
+                feeBadge.className = feeRatePct === 9
+                    ? 'px-2 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700'
+                    : 'px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700';
+                feeBadge.textContent = feeRatePct + '%';
+                feeTd.appendChild(feeBadge);
 
-                const feeInput = document.createElement('input');
-                feeInput.type = 'number';
-                feeInput.min = '0';
-                feeInput.max = '100';
-                feeInput.step = '0.1';
-                feeInput.value = dominantFeeRate;
-                feeInput.dataset.company = company;
-                feeInput.className = 'fee-rate-input w-20 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-purple-400';
-
-                const feeUnit = document.createElement('span');
-                feeUnit.className = 'ml-1 text-sm text-gray-500';
-                feeUnit.textContent = '%';
-
-                feeTd.appendChild(feeInput);
-                feeTd.appendChild(feeUnit);
-
-                // 정산율 입력 (수수료율에 따라 자동 채움)
+                // 정산율 입력
                 const settleTd = document.createElement('td');
-                settleTd.className = 'px-4 py-3 text-center';
+                settleTd.className = 'px-4 py-2.5 text-center';
 
                 const settleInput = document.createElement('input');
                 settleInput.type = 'number';
                 settleInput.min = '0';
                 settleInput.max = '100';
                 settleInput.step = '0.1';
-                settleInput.value = getSettlementRate(dominantFeeRate, rate9Val, rate14Val);
-                settleInput.dataset.company = company;
+                settleInput.value = defaultSettlePct;
+                settleInput.dataset.key = key;
                 settleInput.className = 'settle-rate-input w-20 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-400';
 
-                const settleUnit = document.createElement('span');
-                settleUnit.className = 'ml-1 text-sm text-gray-500';
-                settleUnit.textContent = '%';
+                const unit = document.createElement('span');
+                unit.className = 'ml-1 text-sm text-gray-500';
+                unit.textContent = '%';
 
                 settleTd.appendChild(settleInput);
-                settleTd.appendChild(settleUnit);
+                settleTd.appendChild(unit);
 
-                // 수수료율 변경 시 정산율 자동 입력
-                feeInput.addEventListener('input', () => {
-                    const feeVal = parseFloat(feeInput.value);
-                    const r9 = parseFloat(document.getElementById('rate9Input').value);
-                    const r14 = parseFloat(document.getElementById('rate14Input').value);
-                    const auto = getSettlementRate(feeVal, r9, r14);
-                    if (auto !== '') settleInput.value = auto;
-                });
-
-                tr.appendChild(nameTd);
+                tr.appendChild(accountTd);
+                tr.appendChild(mediaTd);
                 tr.appendChild(feeTd);
                 tr.appendChild(settleTd);
                 tbody.appendChild(tr);
@@ -325,59 +312,41 @@
             const rate9Val = parseFloat(document.getElementById('rate9Input').value);
             const rate14Val = parseFloat(document.getElementById('rate14Input').value);
 
-            document.querySelectorAll('.fee-rate-input').forEach(feeInput => {
-                const company = feeInput.dataset.company;
-                const meta = companyMeta.get(company);
+            document.querySelectorAll('.settle-rate-input').forEach(input => {
+                const meta = rowMeta.get(input.dataset.key);
                 if (!meta) return;
-                feeInput.value = meta.dominantFeeRate;
-
-                const settleInput = feeInput.closest('tr').querySelector('.settle-rate-input');
-                if (settleInput) {
-                    settleInput.value = getSettlementRate(meta.dominantFeeRate, rate9Val, rate14Val);
-                }
+                input.value = Math.abs(meta.feeRatePct - 9) < 0.1 ? rate9Val : rate14Val;
             });
         }
 
         function handleCalculate() {
             if (!parsedRows) { showError('먼저 파일을 분석해주세요.'); return; }
 
-            const companyFeeRates = new Map();
-            const companySettleRates = new Map();
-
-            const rows = document.querySelectorAll('#companyRatesBody tr');
-            for (const row of rows) {
-                const feeInput = row.querySelector('.fee-rate-input');
-                const settleInput = row.querySelector('.settle-rate-input');
-                const company = feeInput.dataset.company;
-
-                const feeVal = parseFloat(feeInput.value);
-                const settleVal = parseFloat(settleInput.value);
-
-                if (isNaN(feeVal) || feeVal < 0 || feeVal > 100) {
-                    showError('"' + company + '"의 수수료율은 0~100 사이의 값을 입력해주세요.');
+            const settleRates = new Map();
+            const inputs = document.querySelectorAll('.settle-rate-input');
+            for (const input of inputs) {
+                const val = parseFloat(input.value);
+                const key = input.dataset.key;
+                const meta = rowMeta.get(key);
+                if (isNaN(val) || val < 0 || val > 100) {
+                    showError('"' + (meta ? meta.accountName + ' / ' + meta.media : key) + '"의 정산율은 0~100 사이의 값을 입력해주세요.');
                     return;
                 }
-                if (isNaN(settleVal) || settleVal < 0 || settleVal > 100) {
-                    showError('"' + company + '"의 정산율은 0~100 사이의 값을 입력해주세요.');
-                    return;
-                }
-
-                companyFeeRates.set(company, feeVal);
-                companySettleRates.set(company, settleVal / 100);
+                settleRates.set(key, val / 100);
             }
 
             error.classList.add('hidden');
             results.classList.add('hidden');
 
             try {
-                const calculatedData = calculateSettlement(parsedRows, companyFeeRates, companySettleRates);
+                const calculatedData = calculateSettlement(parsedRows, settleRates);
                 displayResults(calculatedData);
             } catch (err) {
                 showError('계산 중 오류가 발생했습니다: ' + err.message);
             }
         }
 
-        function calculateSettlement(rows, companyFeeRates, companySettleRates) {
+        function calculateSettlement(rows, settleRates) {
             const accountMap = new Map();
 
             for (let i = 3; i < rows.length; i++) {
@@ -385,7 +354,7 @@
                 if (!row || row.length < 10) continue;
 
                 const media = row[0];
-                const accountName = row[5];
+                const accountName = row[1];
                 const amount = parseFloat(row[8]);
                 const feeRate = parseFloat(row[9]);
 
@@ -393,15 +362,13 @@
                     isNaN(amount) || isNaN(feeRate)) continue;
                 if (typeof media === 'string' && media.includes('합')) continue;
 
-                const appliedFeeRate = companyFeeRates.get(accountName) ?? (feeRate * 100);
-                const settlementRate = companySettleRates.get(accountName) ?? 0;
+                const key = makeKey(accountName, media);
+                const settlementRate = settleRates.get(key) ?? 0;
                 const settlement = amount * settlementRate;
 
                 if (!accountMap.has(accountName)) {
                     accountMap.set(accountName, {
                         accountName,
-                        appliedFeeRate,
-                        settlementRate,
                         totalAmount: 0,
                         totalSettlement: 0,
                         details: []
@@ -411,7 +378,13 @@
                 const account = accountMap.get(accountName);
                 account.totalAmount += amount;
                 account.totalSettlement += settlement;
-                account.details.push({ media, amount, settlement });
+                account.details.push({
+                    media,
+                    feeRatePct: Math.round(feeRate * 100),
+                    settlementRatePct: settlementRate * 100,
+                    amount,
+                    settlement
+                });
             }
 
             const accounts = Array.from(accountMap.values())
@@ -441,9 +414,6 @@
                                   index === 1 ? 'text-gray-400 font-bold' :
                                   index === 2 ? 'text-orange-600 font-bold' : '';
 
-                const feeDisplay = account.appliedFeeRate.toFixed(1).replace(/\.0$/, '') + '%';
-                const settleDisplay = (account.settlementRate * 100).toFixed(1).replace(/\.0$/, '') + '%';
-
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="${rankClass}">${index + 1}</span>
@@ -453,12 +423,6 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-gray-900">
                         ${Math.floor(account.totalAmount).toLocaleString('ko-KR')}원
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right">
-                        <span class="px-2 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700">${feeDisplay}</span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right">
-                        <span class="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">${settleDisplay}</span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right font-bold text-green-600">
                         ${Math.floor(account.totalSettlement).toLocaleString('ko-KR')}원
@@ -477,30 +441,27 @@
             const detailsCard = document.getElementById('detailsCard');
             const detailsContent = document.getElementById('detailsContent');
 
-            const feeDisplay = account.appliedFeeRate.toFixed(1).replace(/\.0$/, '') + '%';
-            const settleDisplay = (account.settlementRate * 100).toFixed(1).replace(/\.0$/, '') + '%';
-
             let html = `
                 <div class="mb-4">
                     <h4 class="text-lg font-bold text-gray-800">${escapeHtml(account.accountName)}</h4>
                     <p class="text-sm text-gray-600">총 광고비: ${Math.floor(account.totalAmount).toLocaleString('ko-KR')}원</p>
-                    <p class="text-sm text-gray-600">
-                        수수료율: <span class="font-bold text-purple-700">${feeDisplay}</span>
-                        &nbsp;/&nbsp;
-                        정산율: <span class="font-bold text-green-600">${settleDisplay}</span>
-                    </p>
                     <p class="text-sm font-bold text-green-600">총 정산액: ${Math.floor(account.totalSettlement).toLocaleString('ko-KR')}원</p>
                 </div>
                 <div class="space-y-2">
             `;
 
             account.details.forEach(detail => {
+                const feeBadgeClass = detail.feeRatePct === 9
+                    ? 'bg-purple-100 text-purple-700'
+                    : 'bg-blue-100 text-blue-700';
+                const settleDisplay = detail.settlementRatePct.toFixed(1).replace(/\.0$/, '') + '%';
+
                 html += `
                     <div class="border rounded-lg p-4">
                         <div class="flex justify-between items-center mb-2">
                             <span class="font-medium text-gray-800">${escapeHtml(detail.media)}</span>
                             <div class="flex gap-2">
-                                <span class="px-2 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700">수수료 ${feeDisplay}</span>
+                                <span class="px-2 py-1 rounded-full text-xs font-bold ${feeBadgeClass}">수수료 ${detail.feeRatePct}%</span>
                                 <span class="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">정산 ${settleDisplay}</span>
                             </div>
                         </div>
