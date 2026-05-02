@@ -180,13 +180,12 @@
             return accountName + '|||' + media;
         }
 
-        // 원래 동작하던 컬럼 그대로 사용
         function readRow(row) {
-            if (!row || row.length < 10) return null;
-            const media       = row[0];  // 매체사
-            const accountName = row[5];  // 고객사
-            const amount      = parseFloat(row[8]);  // 광고비 합계금액
-            const feeRate     = parseFloat(row[9]);  // 수수료율 (0.09 또는 0.14)
+            if (!row || row.length < 11) return null;
+            const media       = row[0];   // A열: 매체사
+            const accountName = row[6];   // G열: 계정명(고객사)
+            const amount      = parseFloat(row[9]);   // J열: 합계금액(광고비)
+            const feeRate     = parseFloat(row[10]);  // K열: 수수료율
             if (!media || !accountName || accountName === '-' ||
                 isNaN(amount) || isNaN(feeRate)) return null;
             if (typeof media === 'string' && media.includes('합')) return null;
