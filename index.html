@@ -223,11 +223,11 @@
 
             for (let i = 3; i < rows.length; i++) {
                 const row = rows[i];
-                if (!row || row.length < 10) continue;
-                const media = row[0];
-                const accountName = row[1];
-                const amount = parseFloat(row[8]);
-                const feeRate = parseFloat(row[9]);
+                if (!row || row.length < 11) continue;
+                const media = row[1];
+                const accountName = row[6];
+                const amount = parseFloat(row[9]);
+                const feeRate = parseFloat(row[10]);
                 if (!media || !accountName || accountName === '-' ||
                     isNaN(amount) || isNaN(feeRate)) continue;
                 if (typeof media === 'string' && media.includes('합')) continue;
@@ -352,12 +352,12 @@
 
             for (let i = 3; i < rows.length; i++) {
                 const row = rows[i];
-                if (!row || row.length < 10) continue;
+                if (!row || row.length < 11) continue;
 
-                const media = row[0];
-                const accountName = row[1];
-                const amount = parseFloat(row[8]);
-                const feeRate = parseFloat(row[9]);
+                const media = row[1];
+                const accountName = row[6];
+                const amount = parseFloat(row[9]);
+                const feeRate = parseFloat(row[10]);
 
                 if (!media || !accountName || accountName === '-' ||
                     isNaN(amount) || isNaN(feeRate)) continue;
