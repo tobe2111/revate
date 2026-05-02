@@ -12,7 +12,6 @@
     <div class="min-h-screen py-8 px-4">
         <div class="max-w-6xl mx-auto">
 
-            <!-- 1단계: 파일 업로드 -->
             <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
                 <div class="flex items-center mb-6">
                     <i class="fas fa-calculator text-3xl text-blue-600 mr-3"></i>
@@ -22,30 +21,8 @@
                 <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
                     <p class="text-sm text-gray-700">
                         <i class="fas fa-info-circle mr-2"></i>
-                        엑셀 파일을 업로드하면 고객사 · 매체사별 정산율을 설정한 뒤 금액을 계산합니다.
+                        엑셀 파일을 업로드하면 고객사별 정산 금액을 자동으로 계산합니다.
                     </p>
-                </div>
-
-                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-                    <h2 class="text-sm font-semibold text-gray-700 mb-3">
-                        <i class="fas fa-sliders-h mr-2"></i>수수료율별 기본 정산율 (자동 입력 기준)
-                    </h2>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm text-gray-600 mb-1">
-                                수수료율 <span class="font-bold text-purple-700">9%</span> 적용 정산율 (%)
-                            </label>
-                            <input type="number" id="rate9Input" value="5" min="0" max="100" step="0.1"
-                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-                        </div>
-                        <div>
-                            <label class="block text-sm text-gray-600 mb-1">
-                                수수료율 <span class="font-bold text-blue-700">14%</span> 적용 정산율 (%)
-                            </label>
-                            <input type="number" id="rate14Input" value="10" min="0" max="100" step="0.1"
-                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-                        </div>
-                    </div>
                 </div>
 
                 <div class="mb-6">
@@ -71,33 +48,32 @@
                 </div>
             </div>
 
-            <!-- 2단계: 매체사별 정산율 설정 -->
-            <div id="companyRatesSection" class="hidden bg-white rounded-lg shadow-lg p-6 mb-6">
+            <!-- 정산율 확인 및 수정 -->
+            <div id="rateSection" class="hidden bg-white rounded-lg shadow-lg p-6 mb-6">
                 <div class="flex items-center justify-between mb-2">
                     <h2 class="text-xl font-bold text-gray-800">
-                        <i class="fas fa-building mr-2"></i>고객사 · 매체사별 정산율 설정
+                        <i class="fas fa-sliders-h mr-2"></i>정산율 확인 및 수정
                     </h2>
-                    <button id="resetRatesBtn"
+                    <button id="resetBtn"
                             class="text-sm text-gray-500 hover:text-blue-600 border border-gray-300 hover:border-blue-400 rounded px-3 py-1 transition">
                         <i class="fas fa-undo mr-1"></i>기본값으로 초기화
                     </button>
                 </div>
                 <p class="text-sm text-gray-500 mb-4">
-                    매체사별로 정산율을 개별 설정하세요. 수수료율은 엑셀에서 읽어온 값입니다.
+                    수수료율 기준으로 정산율이 자동 설정됩니다. 예외가 있는 항목만 직접 수정하세요.
                 </p>
 
                 <div class="overflow-x-auto mb-6">
-                    <table class="min-w-full divide-y divide-gray-200">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">고객사</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">매체사</th>
-                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-32">수수료율</th>
-                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-36">정산율 (%)</th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">고객사</th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">매체사</th>
+                                <th class="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider w-28">수수료율</th>
+                                <th class="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider w-36">정산율 (%)</th>
                             </tr>
                         </thead>
-                        <tbody id="companyRatesBody" class="bg-white divide-y divide-gray-200">
-                        </tbody>
+                        <tbody id="rateTableBody" class="bg-white divide-y divide-gray-200"></tbody>
                     </table>
                 </div>
 
@@ -107,7 +83,7 @@
                 </button>
             </div>
 
-            <!-- 3단계: 결과 -->
+            <!-- 결과 -->
             <div id="results" class="hidden">
                 <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
                     <h2 class="text-2xl font-bold text-gray-800 mb-4">
@@ -135,8 +111,7 @@
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">정산 금액</th>
                                 </tr>
                             </thead>
-                            <tbody id="summaryTableBody" class="bg-white divide-y divide-gray-200">
-                            </tbody>
+                            <tbody id="summaryTableBody" class="bg-white divide-y divide-gray-200"></tbody>
                         </table>
                     </div>
                 </div>
@@ -153,23 +128,22 @@
     </div>
 
     <script>
-        const fileInput = document.getElementById('fileInput');
+        const fileInput  = document.getElementById('fileInput');
         const analyzeBtn = document.getElementById('analyzeBtn');
         const calculateBtn = document.getElementById('calculateBtn');
-        const resetRatesBtn = document.getElementById('resetRatesBtn');
-        const loading = document.getElementById('loading');
-        const error = document.getElementById('error');
-        const results = document.getElementById('results');
-        const companyRatesSection = document.getElementById('companyRatesSection');
+        const resetBtn   = document.getElementById('resetBtn');
+        const loading    = document.getElementById('loading');
+        const error      = document.getElementById('error');
+        const rateSection = document.getElementById('rateSection');
+        const results    = document.getElementById('results');
 
         let parsedRows = null;
-        // Map<rowKey, { accountName, media, feeRatePct, defaultSettlePct }>
-        // rowKey = `${accountName}|||${media}`
+        // key = "고객사|||매체사"  value = { accountName, media, feeRate, defaultSettlePct }
         let rowMeta = new Map();
 
         analyzeBtn.addEventListener('click', handleAnalyze);
         calculateBtn.addEventListener('click', handleCalculate);
-        resetRatesBtn.addEventListener('click', resetRates);
+        resetBtn.addEventListener('click', () => resetSettlementRates());
 
         async function handleAnalyze() {
             const file = fileInput.files[0];
@@ -179,20 +153,9 @@
                 return;
             }
 
-            const rate9Val = parseFloat(document.getElementById('rate9Input').value);
-            const rate14Val = parseFloat(document.getElementById('rate14Input').value);
-            if (isNaN(rate9Val) || rate9Val < 0 || rate9Val > 100) {
-                showError('수수료율 9% 정산율은 0~100 사이의 값을 입력해주세요.');
-                return;
-            }
-            if (isNaN(rate14Val) || rate14Val < 0 || rate14Val > 100) {
-                showError('수수료율 14% 정산율은 0~100 사이의 값을 입력해주세요.');
-                return;
-            }
-
             error.classList.add('hidden');
             results.classList.add('hidden');
-            companyRatesSection.classList.add('hidden');
+            rateSection.classList.add('hidden');
             loading.classList.remove('hidden');
             analyzeBtn.disabled = true;
 
@@ -202,9 +165,9 @@
                 const worksheet = workbook.Sheets[workbook.SheetNames[0]];
                 parsedRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-                rowMeta = buildRowMeta(parsedRows, rate9Val, rate14Val);
-                renderTable(rowMeta);
-                companyRatesSection.classList.remove('hidden');
+                rowMeta = buildRowMeta(parsedRows);
+                renderRateTable(rowMeta);
+                rateSection.classList.remove('hidden');
             } catch (err) {
                 showError('파일 처리 중 오류가 발생했습니다: ' + err.message);
             } finally {
@@ -217,43 +180,52 @@
             return accountName + '|||' + media;
         }
 
-        // 고객사 + 매체사 조합별로 수수료율(엑셀값) 추출
-        function buildRowMeta(rows, rate9Val, rate14Val) {
+        // 원래 동작하던 컬럼 그대로 사용
+        function readRow(row) {
+            if (!row || row.length < 10) return null;
+            const media       = row[0];  // 매체사
+            const accountName = row[5];  // 고객사
+            const amount      = parseFloat(row[8]);  // 광고비 합계금액
+            const feeRate     = parseFloat(row[9]);  // 수수료율 (0.09 또는 0.14)
+            if (!media || !accountName || accountName === '-' ||
+                isNaN(amount) || isNaN(feeRate)) return null;
+            if (typeof media === 'string' && media.includes('합')) return null;
+            return { media, accountName, amount, feeRate };
+        }
+
+        function defaultSettlePct(feeRate) {
+            if (Math.abs(feeRate - 0.09) < 0.001) return 5;
+            return 10;
+        }
+
+        function buildRowMeta(rows) {
             const meta = new Map();
-
             for (let i = 3; i < rows.length; i++) {
-                const row = rows[i];
-                if (!row || row.length < 11) continue;
-                const media = row[1];
-                const accountName = row[6];
-                const amount = parseFloat(row[9]);
-                const feeRate = parseFloat(row[10]);
-                if (!media || !accountName || accountName === '-' ||
-                    isNaN(amount) || isNaN(feeRate)) continue;
-                if (typeof media === 'string' && media.includes('합')) continue;
-
-                const key = makeKey(accountName, media);
-                if (meta.has(key)) continue; // 첫 번째 행 기준으로 수수료율 결정
-
-                const feeRatePct = Math.round(feeRate * 100);
-                const defaultSettlePct = Math.abs(feeRate - 0.09) < 0.001 ? rate9Val : rate14Val;
-                meta.set(key, { accountName, media, feeRatePct, defaultSettlePct });
+                const r = readRow(rows[i]);
+                if (!r) continue;
+                const key = makeKey(r.accountName, r.media);
+                if (meta.has(key)) continue;
+                meta.set(key, {
+                    accountName: r.accountName,
+                    media: r.media,
+                    feeRate: r.feeRate,
+                    defaultSettlePct: defaultSettlePct(r.feeRate)
+                });
             }
-
             return meta;
         }
 
-        function renderTable(meta) {
-            const tbody = document.getElementById('companyRatesBody');
+        function renderRateTable(meta) {
+            const tbody = document.getElementById('rateTableBody');
             tbody.innerHTML = '';
-
             let prevAccount = null;
 
-            for (const [key, { accountName, media, feeRatePct, defaultSettlePct }] of meta) {
+            for (const [key, { accountName, media, feeRate, defaultSettlePct }] of meta) {
+                const feeRatePct = Math.round(feeRate * 100);
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-gray-50';
 
-                // 고객사명 (같은 회사 연속이면 흐리게)
+                // 고객사 (같은 회사 연속이면 화살표로)
                 const accountTd = document.createElement('td');
                 accountTd.className = 'px-4 py-2.5 text-sm';
                 if (accountName !== prevAccount) {
@@ -265,39 +237,36 @@
                     accountTd.textContent = '↳';
                 }
 
-                // 매체사명
+                // 매체사
                 const mediaTd = document.createElement('td');
                 mediaTd.className = 'px-4 py-2.5 text-sm text-gray-700';
                 mediaTd.textContent = media;
 
-                // 수수료율 (읽기 전용 배지)
+                // 수수료율 (읽기전용 배지)
                 const feeTd = document.createElement('td');
                 feeTd.className = 'px-4 py-2.5 text-center';
-                const feeBadge = document.createElement('span');
-                feeBadge.className = feeRatePct === 9
+                const badge = document.createElement('span');
+                badge.className = feeRatePct === 9
                     ? 'px-2 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700'
                     : 'px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700';
-                feeBadge.textContent = feeRatePct + '%';
-                feeTd.appendChild(feeBadge);
+                badge.textContent = feeRatePct + '%';
+                feeTd.appendChild(badge);
 
                 // 정산율 입력
                 const settleTd = document.createElement('td');
                 settleTd.className = 'px-4 py-2.5 text-center';
-
-                const settleInput = document.createElement('input');
-                settleInput.type = 'number';
-                settleInput.min = '0';
-                settleInput.max = '100';
-                settleInput.step = '0.1';
-                settleInput.value = defaultSettlePct;
-                settleInput.dataset.key = key;
-                settleInput.className = 'settle-rate-input w-20 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-400';
-
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.min = '0';
+                input.max = '100';
+                input.step = '0.1';
+                input.value = defaultSettlePct;
+                input.dataset.key = key;
+                input.className = 'settle-input w-20 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-400';
                 const unit = document.createElement('span');
                 unit.className = 'ml-1 text-sm text-gray-500';
                 unit.textContent = '%';
-
-                settleTd.appendChild(settleInput);
+                settleTd.appendChild(input);
                 settleTd.appendChild(unit);
 
                 tr.appendChild(accountTd);
@@ -308,40 +277,33 @@
             }
         }
 
-        function resetRates() {
-            const rate9Val = parseFloat(document.getElementById('rate9Input').value);
-            const rate14Val = parseFloat(document.getElementById('rate14Input').value);
-
-            document.querySelectorAll('.settle-rate-input').forEach(input => {
+        function resetSettlementRates() {
+            document.querySelectorAll('.settle-input').forEach(input => {
                 const meta = rowMeta.get(input.dataset.key);
-                if (!meta) return;
-                input.value = Math.abs(meta.feeRatePct - 9) < 0.1 ? rate9Val : rate14Val;
+                if (meta) input.value = meta.defaultSettlePct;
             });
         }
 
         function handleCalculate() {
             if (!parsedRows) { showError('먼저 파일을 분석해주세요.'); return; }
 
-            // 매체사별 정산율 수집
-            const settleRates = new Map(); // key → rate (0~1)
-            const inputs = document.querySelectorAll('.settle-rate-input');
-            for (const input of inputs) {
+            // 정산율 수집
+            const settleRates = new Map();
+            for (const input of document.querySelectorAll('.settle-input')) {
                 const val = parseFloat(input.value);
-                const key = input.dataset.key;
-                const meta = rowMeta.get(key);
+                const meta = rowMeta.get(input.dataset.key);
                 if (isNaN(val) || val < 0 || val > 100) {
-                    showError('"' + (meta ? meta.accountName + ' / ' + meta.media : key) + '"의 정산율은 0~100 사이의 값을 입력해주세요.');
+                    showError('"' + (meta ? meta.accountName + ' / ' + meta.media : '') + '"의 정산율은 0~100 사이의 값을 입력해주세요.');
                     return;
                 }
-                settleRates.set(key, val / 100);
+                settleRates.set(input.dataset.key, val / 100);
             }
 
             error.classList.add('hidden');
             results.classList.add('hidden');
 
             try {
-                const calculatedData = calculateSettlement(parsedRows, settleRates);
-                displayResults(calculatedData);
+                displayResults(calculateSettlement(parsedRows, settleRates));
             } catch (err) {
                 showError('계산 중 오류가 발생했습니다: ' + err.message);
             }
@@ -351,39 +313,29 @@
             const accountMap = new Map();
 
             for (let i = 3; i < rows.length; i++) {
-                const row = rows[i];
-                if (!row || row.length < 11) continue;
+                const r = readRow(rows[i]);
+                if (!r) continue;
 
-                const media = row[1];
-                const accountName = row[6];
-                const amount = parseFloat(row[9]);
-                const feeRate = parseFloat(row[10]);
+                const key = makeKey(r.accountName, r.media);
+                const settlementRate = settleRates.get(key) ?? defaultSettlePct(r.feeRate) / 100;
+                const settlement = r.amount * settlementRate;
 
-                if (!media || !accountName || accountName === '-' ||
-                    isNaN(amount) || isNaN(feeRate)) continue;
-                if (typeof media === 'string' && media.includes('합')) continue;
-
-                const key = makeKey(accountName, media);
-                const settlementRate = settleRates.get(key) ?? 0;
-                const settlement = amount * settlementRate;
-
-                if (!accountMap.has(accountName)) {
-                    accountMap.set(accountName, {
-                        accountName,
+                if (!accountMap.has(r.accountName)) {
+                    accountMap.set(r.accountName, {
+                        accountName: r.accountName,
                         totalAmount: 0,
                         totalSettlement: 0,
                         details: []
                     });
                 }
-
-                const account = accountMap.get(accountName);
-                account.totalAmount += amount;
-                account.totalSettlement += settlement;
-                account.details.push({
-                    media,
-                    feeRatePct: Math.round(feeRate * 100),
-                    settlementRatePct: settlementRate * 100,
-                    amount,
+                const acc = accountMap.get(r.accountName);
+                acc.totalAmount += r.amount;
+                acc.totalSettlement += settlement;
+                acc.details.push({
+                    media: r.media,
+                    feeRatePct: Math.round(r.feeRate * 100),
+                    settlePct: settlementRate * 100,
+                    amount: r.amount,
                     settlement
                 });
             }
@@ -391,10 +343,11 @@
             const accounts = Array.from(accountMap.values())
                 .sort((a, b) => b.totalSettlement - a.totalSettlement);
 
-            const totalAdCost = accounts.reduce((sum, acc) => sum + acc.totalAmount, 0);
-            const totalSettlement = accounts.reduce((sum, acc) => sum + acc.totalSettlement, 0);
-
-            return { accounts, totalAdCost, totalSettlement };
+            return {
+                accounts,
+                totalAdCost: accounts.reduce((s, a) => s + a.totalAmount, 0),
+                totalSettlement: accounts.reduce((s, a) => s + a.totalSettlement, 0)
+            };
         }
 
         function displayResults(data) {
@@ -405,70 +358,55 @@
 
             const tbody = document.getElementById('summaryTableBody');
             tbody.innerHTML = '';
-
-            data.accounts.forEach((account, index) => {
+            data.accounts.forEach((acc, i) => {
                 const row = document.createElement('tr');
                 row.className = 'hover:bg-gray-50 cursor-pointer';
-                row.onclick = () => showDetails(account);
-
-                const rankClass = index === 0 ? 'text-yellow-600 font-bold' :
-                                  index === 1 ? 'text-gray-400 font-bold' :
-                                  index === 2 ? 'text-orange-600 font-bold' : '';
-
+                row.onclick = () => showDetails(acc);
+                const rankClass = i === 0 ? 'text-yellow-600 font-bold' :
+                                  i === 1 ? 'text-gray-400 font-bold' :
+                                  i === 2 ? 'text-orange-600 font-bold' : '';
                 row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="${rankClass}">${index + 1}</span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
-                        ${escapeHtml(account.accountName)}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-gray-900">
-                        ${Math.floor(account.totalAmount).toLocaleString('ko-KR')}원
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right font-bold text-green-600">
-                        ${Math.floor(account.totalSettlement).toLocaleString('ko-KR')}원
-                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap"><span class="${rankClass}">${i + 1}</span></td>
+                    <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${escapeHtml(acc.accountName)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-gray-900">${Math.floor(acc.totalAmount).toLocaleString('ko-KR')}원</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right font-bold text-green-600">${Math.floor(acc.totalSettlement).toLocaleString('ko-KR')}원</td>
                 `;
                 tbody.appendChild(row);
             });
 
             results.classList.remove('hidden');
-            if (data.accounts.length > 0) {
-                showDetails(data.accounts[0]);
-            }
+            if (data.accounts.length > 0) showDetails(data.accounts[0]);
         }
 
-        function showDetails(account) {
+        function showDetails(acc) {
             const detailsCard = document.getElementById('detailsCard');
             const detailsContent = document.getElementById('detailsContent');
 
             let html = `
                 <div class="mb-4">
-                    <h4 class="text-lg font-bold text-gray-800">${escapeHtml(account.accountName)}</h4>
-                    <p class="text-sm text-gray-600">총 광고비: ${Math.floor(account.totalAmount).toLocaleString('ko-KR')}원</p>
-                    <p class="text-sm font-bold text-green-600">총 정산액: ${Math.floor(account.totalSettlement).toLocaleString('ko-KR')}원</p>
+                    <h4 class="text-lg font-bold text-gray-800">${escapeHtml(acc.accountName)}</h4>
+                    <p class="text-sm text-gray-600">총 광고비: ${Math.floor(acc.totalAmount).toLocaleString('ko-KR')}원</p>
+                    <p class="text-sm font-bold text-green-600">총 정산액: ${Math.floor(acc.totalSettlement).toLocaleString('ko-KR')}원</p>
                 </div>
                 <div class="space-y-2">
             `;
 
-            account.details.forEach(detail => {
-                const feeBadgeClass = detail.feeRatePct === 9
-                    ? 'bg-purple-100 text-purple-700'
-                    : 'bg-blue-100 text-blue-700';
-                const settleDisplay = detail.settlementRatePct.toFixed(1).replace(/\.0$/, '') + '%';
-
+            acc.details.forEach(d => {
+                const feeBadge = d.feeRatePct === 9
+                    ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700';
+                const settlePct = d.settlePct.toFixed(1).replace(/\.0$/, '') + '%';
                 html += `
                     <div class="border rounded-lg p-4">
                         <div class="flex justify-between items-center mb-2">
-                            <span class="font-medium text-gray-800">${escapeHtml(detail.media)}</span>
+                            <span class="font-medium text-gray-800">${escapeHtml(d.media)}</span>
                             <div class="flex gap-2">
-                                <span class="px-2 py-1 rounded-full text-xs font-bold ${feeBadgeClass}">수수료 ${detail.feeRatePct}%</span>
-                                <span class="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">정산 ${settleDisplay}</span>
+                                <span class="px-2 py-1 rounded-full text-xs font-bold ${feeBadge}">수수료 ${d.feeRatePct}%</span>
+                                <span class="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">정산 ${settlePct}</span>
                             </div>
                         </div>
                         <div class="text-sm text-gray-600">
-                            <p>광고비: ${Math.floor(detail.amount).toLocaleString('ko-KR')}원</p>
-                            <p class="font-bold text-green-600">정산액: ${Math.floor(detail.settlement).toLocaleString('ko-KR')}원</p>
+                            <p>광고비: ${Math.floor(d.amount).toLocaleString('ko-KR')}원</p>
+                            <p class="font-bold text-green-600">정산액: ${Math.floor(d.settlement).toLocaleString('ko-KR')}원</p>
                         </div>
                     </div>
                 `;
