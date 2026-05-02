@@ -217,17 +217,17 @@
             return accountName + '|||' + media;
         }
 
-        // 고객사 + 매체사 조합별로 수수료율(엑셀값) 추출
+        // 고객사(G열) + 매체사(B열) 조합별로 수수료율(K열) 추출
         function buildRowMeta(rows, rate9Val, rate14Val) {
             const meta = new Map();
 
             for (let i = 3; i < rows.length; i++) {
                 const row = rows[i];
-                if (!row || row.length < 10) continue;
-                const media = row[0];
-                const accountName = row[1];
-                const amount = parseFloat(row[8]);
-                const feeRate = parseFloat(row[9]);
+                if (!row || row.length < 11) continue;
+                const media = row[1];       // B열: 매체사
+                const accountName = row[6]; // G열: 고객사
+                const amount = parseFloat(row[9]);   // J열: 광고비 합계금액
+                const feeRate = parseFloat(row[10]);  // K열: 수수료율
                 if (!media || !accountName || accountName === '-' ||
                     isNaN(amount) || isNaN(feeRate)) continue;
                 if (typeof media === 'string' && media.includes('합')) continue;
@@ -351,12 +351,12 @@
 
             for (let i = 3; i < rows.length; i++) {
                 const row = rows[i];
-                if (!row || row.length < 10) continue;
+                if (!row || row.length < 11) continue;
 
-                const media = row[0];
-                const accountName = row[1];
-                const amount = parseFloat(row[8]);
-                const feeRate = parseFloat(row[9]);
+                const media = row[1];       // B열: 매체사
+                const accountName = row[6]; // G열: 고객사
+                const amount = parseFloat(row[9]);   // J열: 광고비 합계금액
+                const feeRate = parseFloat(row[10]);  // K열: 수수료율
 
                 if (!media || !accountName || accountName === '-' ||
                     isNaN(amount) || isNaN(feeRate)) continue;
