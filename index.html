@@ -87,6 +87,13 @@
                     </table>
                 </div>
 
+                <div class="flex items-center gap-3 mb-4">
+                    <label class="text-sm font-medium text-gray-700 whitespace-nowrap">정산 월</label>
+                    <input type="month" id="settleMonth"
+                           class="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                    <span class="text-xs text-gray-400">계산 결과가 브라우저에 저장되어 전월과 자동 비교됩니다.</span>
+                </div>
+
                 <button id="calculateBtn"
                         class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center">
                     <i class="fas fa-calculator mr-2"></i>정산 계산하기
@@ -112,6 +119,7 @@
                         <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white">
                             <p class="text-sm opacity-90 mb-1">전체 지급액 (부가세 포함)</p>
                             <p class="text-2xl font-bold" id="totalPayout">0원</p>
+                            <p class="text-xs mt-1 opacity-90" id="payoutDelta"></p>
                         </div>
                     </div>
 
@@ -124,6 +132,7 @@
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">광고비 (공급가)</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">정산액 (공급가)</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">지급액 (부가세 포함)</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">전월대비</th>
                                 </tr>
                             </thead>
                             <tbody id="summaryTableBody" class="bg-white divide-y divide-gray-200"></tbody>
@@ -155,6 +164,35 @@
         let parsedRows = null;
         // key = "고객사|||매체사"  value = { accountName, media, feeRate, defaultSettlePct }
         let rowMeta = new Map();
+
+        // ===== 브라우저 저장 (이력 / 예외 정산율 기억) =====
+        const HISTORY_KEY  = 'settlementHistory';
+        const OVERRIDE_KEY = 'settleRateOverrides';
+
+        function loadJSON(key) {
+            try { return JSON.parse(localStorage.getItem(key)) || {}; }
+            catch (e) { return {}; }
+        }
+
+        function prevMonthEntry(month) {
+            const history = loadJSON(HISTORY_KEY);
+            let [y, m] = month.split('-').map(Number);
+            for (let i = 0; i < 12; i++) {
+                m -= 1;
+                if (m === 0) { m = 12; y -= 1; }
+                const label = y + '-' + String(m).padStart(2, '0');
+                if (history[label]) return { label, data: history[label] };
+            }
+            return null;
+        }
+
+        // 정산 월 기본값: 지난달 (보통 전월분을 정산하므로)
+        (function () {
+            const d = new Date();
+            d.setMonth(d.getMonth() - 1);
+            document.getElementById('settleMonth').value =
+                d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        })();
 
         analyzeBtn.addEventListener('click', handleAnalyze);
         calculateBtn.addEventListener('click', handleCalculate);
@@ -234,6 +272,7 @@
             const tbody = document.getElementById('rateTableBody');
             tbody.innerHTML = '';
             let prevAccount = null;
+            const savedOverrides = loadJSON(OVERRIDE_KEY);  // 지난번 수정한 예외 정산율 자동 적용
 
             for (const [key, { accountName, media, feeRate, defaultSettlePct }] of meta) {
                 const feeRatePct = Math.round(feeRate * 100);
@@ -280,7 +319,7 @@
                 input.min = '0';
                 input.max = '100';
                 input.step = '0.1';
-                input.value = defaultSettlePct;
+                input.value = savedOverrides[key] ?? defaultSettlePct;
                 input.dataset.key = key;
                 input.className = 'settle-input w-16 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-400';
                 input.addEventListener('input', () => refreshRowState(tr, input));
@@ -391,7 +430,35 @@
             results.classList.add('hidden');
 
             try {
-                displayResults(calculateSettlement(parsedRows, settleRates));
+                const data = calculateSettlement(parsedRows, settleRates);
+
+                // 예외 정산율 기억 (다음 달 파일 분석 시 자동 적용)
+                const overrides = {};
+                for (const input of document.querySelectorAll('.settle-input')) {
+                    const meta = rowMeta.get(input.dataset.key);
+                    const val = parseFloat(input.value);
+                    if (meta && val !== meta.defaultSettlePct) overrides[input.dataset.key] = val;
+                }
+                localStorage.setItem(OVERRIDE_KEY, JSON.stringify(overrides));
+
+                // 이력 저장 + 전월 데이터 조회
+                const month = document.getElementById('settleMonth').value;
+                let prev = null;
+                if (month) {
+                    prev = prevMonthEntry(month);
+                    const history = loadJSON(HISTORY_KEY);
+                    history[month] = {
+                        totalAdCost: data.totalAdCost,
+                        totalSettlement: data.totalSettlement,
+                        totalPayout: data.totalPayout,
+                        accounts: Object.fromEntries(data.accounts.map(a =>
+                            [a.accountName, { amount: a.totalAmount, settlement: a.totalSettlement, payout: a.totalPayout }])),
+                        savedAt: new Date().toISOString()
+                    };
+                    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+                }
+
+                displayResults(data, prev);
             } catch (err) {
                 showError('계산 중 오류가 발생했습니다: ' + err.message);
             }
@@ -444,13 +511,28 @@
             };
         }
 
-        function displayResults(data) {
+        function formatDelta(diff) {
+            if (diff > 0) return `<span class="text-red-500 text-sm font-medium">▲ ${Math.floor(diff).toLocaleString('ko-KR')}원</span>`;
+            if (diff < 0) return `<span class="text-blue-500 text-sm font-medium">▼ ${Math.floor(-diff).toLocaleString('ko-KR')}원</span>`;
+            return `<span class="text-gray-400 text-sm">—</span>`;
+        }
+
+        function displayResults(data, prev) {
             document.getElementById('totalAdCost').textContent =
                 Math.floor(data.totalAdCost).toLocaleString('ko-KR') + '원';
             document.getElementById('totalSettlement').textContent =
                 Math.floor(data.totalSettlement).toLocaleString('ko-KR') + '원';
             document.getElementById('totalPayout').textContent =
                 Math.floor(data.totalPayout).toLocaleString('ko-KR') + '원';
+
+            const deltaEl = document.getElementById('payoutDelta');
+            if (prev) {
+                const diff = data.totalPayout - prev.data.totalPayout;
+                const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '—';
+                deltaEl.textContent = `${prev.label} 대비 ${arrow} ${Math.floor(Math.abs(diff)).toLocaleString('ko-KR')}원`;
+            } else {
+                deltaEl.textContent = '';
+            }
 
             const tbody = document.getElementById('summaryTableBody');
             tbody.innerHTML = '';
@@ -461,12 +543,22 @@
                 const rankClass = i === 0 ? 'text-yellow-600 font-bold' :
                                   i === 1 ? 'text-gray-400 font-bold' :
                                   i === 2 ? 'text-orange-600 font-bold' : '';
+
+                let deltaHtml = '<span class="text-gray-400 text-sm">—</span>';
+                if (prev) {
+                    const prevAcc = prev.data.accounts[acc.accountName];
+                    deltaHtml = prevAcc
+                        ? formatDelta(acc.totalPayout - prevAcc.payout)
+                        : '<span class="text-green-600 text-xs font-bold">신규</span>';
+                }
+
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap"><span class="${rankClass}">${i + 1}</span></td>
                     <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${escapeHtml(acc.accountName)}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-gray-900">${Math.floor(acc.totalAmount).toLocaleString('ko-KR')}원</td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-teal-600 font-medium">${Math.floor(acc.totalSettlement).toLocaleString('ko-KR')}원</td>
                     <td class="px-6 py-4 whitespace-nowrap text-right font-bold text-green-600">${Math.floor(acc.totalPayout).toLocaleString('ko-KR')}원</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right">${deltaHtml}</td>
                 `;
                 tbody.appendChild(row);
             });
