@@ -60,12 +60,22 @@
                     </button>
                 </div>
                 <p class="text-sm text-gray-500 mb-4">
-                    수수료율 기준으로 정산율이 자동 설정됩니다. 예외가 있는 항목만 직접 수정하세요.
+                    수수료율 기준으로 정산율이 자동 설정됩니다. (14% → 10%, 9% → 5%)
+                    예외가 있는 회사만 버튼으로 바꾸거나 직접 입력하세요.
                 </p>
 
-                <div class="overflow-x-auto mb-6">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="relative flex-1">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                        <input type="text" id="rateSearch" placeholder="고객사 또는 매체사 검색"
+                               class="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    </div>
+                    <span id="exceptionCount" class="text-sm text-gray-400 whitespace-nowrap">예외 0건</span>
+                </div>
+
+                <div class="overflow-x-auto mb-6 max-h-96 overflow-y-auto border border-gray-100 rounded-lg">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead class="bg-gray-50">
+                        <thead class="bg-gray-50 sticky top-0 z-10">
                             <tr>
                                 <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">고객사</th>
                                 <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">매체사</th>
@@ -228,19 +238,20 @@
             for (const [key, { accountName, media, feeRate, defaultSettlePct }] of meta) {
                 const feeRatePct = Math.round(feeRate * 100);
                 const tr = document.createElement('tr');
-                tr.className = 'hover:bg-gray-50';
+                tr.className = 'hover:bg-gray-50 transition-colors';
+                tr.dataset.search = (accountName + ' ' + media).toLowerCase();
+                tr.dataset.key = key;
 
-                // 고객사 (같은 회사 연속이면 화살표로)
+                // 고객사 (같은 회사 연속이면 연하게)
                 const accountTd = document.createElement('td');
                 accountTd.className = 'px-4 py-2.5 text-sm';
                 if (accountName !== prevAccount) {
-                    accountTd.className += ' font-semibold text-gray-800 border-t-2 border-gray-100';
-                    accountTd.textContent = accountName;
+                    accountTd.className += ' font-semibold text-gray-800';
                     prevAccount = accountName;
                 } else {
-                    accountTd.className += ' text-gray-400';
-                    accountTd.textContent = '↳';
+                    accountTd.className += ' text-gray-300';
                 }
+                accountTd.textContent = accountName;
 
                 // 매체사
                 const mediaTd = document.createElement('td');
@@ -257,9 +268,13 @@
                 badge.textContent = feeRatePct + '%';
                 feeTd.appendChild(badge);
 
-                // 정산율 입력
+                // 정산율: 원클릭 버튼 + 직접 입력
                 const settleTd = document.createElement('td');
-                settleTd.className = 'px-4 py-2.5 text-center';
+                settleTd.className = 'px-4 py-2.5';
+                const wrap = document.createElement('div');
+                wrap.className = 'flex items-center justify-center gap-1.5';
+
+                const presets = feeRatePct === 9 ? [5] : [10, 12];
                 const input = document.createElement('input');
                 input.type = 'number';
                 input.min = '0';
@@ -267,25 +282,93 @@
                 input.step = '0.1';
                 input.value = defaultSettlePct;
                 input.dataset.key = key;
-                input.className = 'settle-input w-20 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-400';
+                input.className = 'settle-input w-16 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-400';
+                input.addEventListener('input', () => refreshRowState(tr, input));
+
+                presets.forEach(p => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.dataset.preset = p;
+                    btn.textContent = p + '%';
+                    btn.className = 'preset-btn px-2 py-1 rounded text-xs font-bold border transition';
+                    btn.addEventListener('click', () => {
+                        input.value = p;
+                        refreshRowState(tr, input);
+                    });
+                    wrap.appendChild(btn);
+                });
+
                 const unit = document.createElement('span');
-                unit.className = 'ml-1 text-sm text-gray-500';
+                unit.className = 'text-sm text-gray-500';
                 unit.textContent = '%';
-                settleTd.appendChild(input);
-                settleTd.appendChild(unit);
+                wrap.appendChild(input);
+                wrap.appendChild(unit);
+                settleTd.appendChild(wrap);
 
                 tr.appendChild(accountTd);
                 tr.appendChild(mediaTd);
                 tr.appendChild(feeTd);
                 tr.appendChild(settleTd);
                 tbody.appendChild(tr);
+                refreshRowState(tr, input);
             }
+
+            document.getElementById('rateSearch').value = '';
+            updateExceptionCount();
         }
+
+        // 수정 여부에 따라 행 하이라이트 + 버튼 활성 표시
+        function refreshRowState(tr, input) {
+            const meta = rowMeta.get(input.dataset.key);
+            if (!meta) return;
+            const val = parseFloat(input.value);
+            const isException = !isNaN(val) && val !== meta.defaultSettlePct;
+
+            tr.classList.toggle('bg-amber-50', isException);
+            input.classList.toggle('border-amber-400', isException);
+            input.classList.toggle('bg-amber-50', isException);
+            input.classList.toggle('font-bold', isException);
+            input.classList.toggle('text-amber-700', isException);
+
+            tr.querySelectorAll('.preset-btn').forEach(btn => {
+                const active = parseFloat(btn.dataset.preset) === val;
+                btn.className = 'preset-btn px-2 py-1 rounded text-xs font-bold border transition ' +
+                    (active
+                        ? (parseFloat(btn.dataset.preset) === meta.defaultSettlePct
+                            ? 'bg-green-600 border-green-600 text-white'
+                            : 'bg-amber-500 border-amber-500 text-white')
+                        : 'bg-white border-gray-300 text-gray-500 hover:border-gray-400');
+            });
+            updateExceptionCount();
+        }
+
+        function updateExceptionCount() {
+            let count = 0;
+            document.querySelectorAll('.settle-input').forEach(input => {
+                const meta = rowMeta.get(input.dataset.key);
+                if (meta && parseFloat(input.value) !== meta.defaultSettlePct) count++;
+            });
+            const el = document.getElementById('exceptionCount');
+            el.textContent = '예외 ' + count + '건';
+            el.className = count > 0
+                ? 'text-sm font-bold text-amber-600 whitespace-nowrap'
+                : 'text-sm text-gray-400 whitespace-nowrap';
+        }
+
+        document.getElementById('rateSearch').addEventListener('input', function () {
+            const q = this.value.trim().toLowerCase();
+            document.querySelectorAll('#rateTableBody tr').forEach(tr => {
+                tr.classList.toggle('hidden', q !== '' && !tr.dataset.search.includes(q));
+            });
+        });
 
         function resetSettlementRates() {
             document.querySelectorAll('.settle-input').forEach(input => {
                 const meta = rowMeta.get(input.dataset.key);
-                if (meta) input.value = meta.defaultSettlePct;
+                if (meta) {
+                    input.value = meta.defaultSettlePct;
+                    refreshRowState(input.closest('tr'), input);
+                }
             });
         }
 
