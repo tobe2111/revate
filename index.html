@@ -164,6 +164,15 @@
         </div>
     </div>
 
+    <datalist id="titleOptions">
+        <option value="대표님"></option>
+        <option value="팀장님"></option>
+        <option value="실장님"></option>
+        <option value="과장님"></option>
+        <option value="매니저님"></option>
+        <option value="담당자님"></option>
+    </datalist>
+
     <script>
         const fileInput  = document.getElementById('fileInput');
         const analyzeBtn = document.getElementById('analyzeBtn');
@@ -612,16 +621,25 @@
                     <td class="px-6 py-4 whitespace-nowrap text-right font-bold text-green-600">${Math.floor(acc.totalPayout).toLocaleString('ko-KR')}원</td>
                     <td class="px-6 py-4 whitespace-nowrap text-right">${deltaHtml}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-center">
-                        <button class="copy-btn text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded px-2.5 py-1.5 transition font-medium">
-                            <i class="fas fa-copy mr-1"></i>복사
-                        </button>
+                        <div class="flex items-center justify-center gap-1.5">
+                            <input type="text" class="title-input w-20 border border-gray-200 rounded px-2 py-1.5 text-xs text-center text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                   list="titleOptions" title="안내문에 들어갈 호칭">
+                            <button class="copy-btn text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded px-2.5 py-1.5 transition font-medium">
+                                <i class="fas fa-copy mr-1"></i>복사
+                            </button>
+                        </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-center">
                         <button class="sent-btn" data-account="${escapeHtml(acc.accountName)}"></button>
                     </td>
                 `;
+                const titleInput = row.querySelector('.title-input');
+                titleInput.value = getTitle(acc.accountName);
+                titleInput.addEventListener('click', e => e.stopPropagation());
+                titleInput.addEventListener('input', () => setTitle(acc.accountName, titleInput.value));
                 row.querySelector('.copy-btn').addEventListener('click', e => {
                     e.stopPropagation();
+                    setTitle(acc.accountName, titleInput.value);
                     copyNotice(acc, e.currentTarget);
                 });
                 const sentBtn = row.querySelector('.sent-btn');
@@ -658,6 +676,22 @@
             URL.revokeObjectURL(a.href);
         });
 
+        // ===== 담당자 호칭 (회사별, 브라우저 저장) =====
+        const TITLE_KEY = 'recipientTitles';
+        const DEFAULT_TITLE = '대표님';
+
+        function getTitle(accountName) {
+            return loadJSON(TITLE_KEY)[accountName] || DEFAULT_TITLE;
+        }
+
+        function setTitle(accountName, title) {
+            const all = loadJSON(TITLE_KEY);
+            const t = (title || '').trim();
+            if (!t || t === DEFAULT_TITLE) delete all[accountName];
+            else all[accountName] = t;
+            localStorage.setItem(TITLE_KEY, JSON.stringify(all));
+        }
+
         // ===== 정산 안내문 생성 (카톡 발송용) =====
         function buildNotice(acc) {
             const month = document.getElementById('settleMonth').value;
@@ -665,7 +699,7 @@
             const supply = Math.floor(acc.totalSettlement);
             const vat = Math.floor(acc.totalSettlement * 0.1);
             const total = supply + vat;
-            return `안녕하세요 대표님, 좋은 아침입니다!\n\n` +
+            return `안녕하세요 ${getTitle(acc.accountName)}, 좋은 아침입니다!\n\n` +
                 `${monthLabel} 정산 진행 도와드리겠습니다. ` +
                 `세금계산서로 진행 도와드리는 형태로 페이백 비용은 부가세 포함 ${total.toLocaleString('ko-KR')}원 입니다.\n` +
                 `(공급가 ${supply.toLocaleString('ko-KR')}원 + 부가세 ${vat.toLocaleString('ko-KR')}원)\n\n` +
