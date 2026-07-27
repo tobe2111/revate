@@ -60,12 +60,22 @@
                     </button>
                 </div>
                 <p class="text-sm text-gray-500 mb-4">
-                    수수료율 기준으로 정산율이 자동 설정됩니다. 예외가 있는 항목만 직접 수정하세요.
+                    수수료율 기준으로 정산율이 자동 설정됩니다. (14% → 10%, 9% → 5%)
+                    예외가 있는 회사만 버튼으로 바꾸거나 직접 입력하세요.
                 </p>
 
-                <div class="overflow-x-auto mb-6">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="relative flex-1">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                        <input type="text" id="rateSearch" placeholder="고객사 또는 매체사 검색"
+                               class="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    </div>
+                    <span id="exceptionCount" class="text-sm text-gray-400 whitespace-nowrap">예외 0건</span>
+                </div>
+
+                <div class="overflow-x-auto mb-6 max-h-96 overflow-y-auto border border-gray-100 rounded-lg">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead class="bg-gray-50">
+                        <thead class="bg-gray-50 sticky top-0 z-10">
                             <tr>
                                 <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">고객사</th>
                                 <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">매체사</th>
@@ -75,6 +85,13 @@
                         </thead>
                         <tbody id="rateTableBody" class="bg-white divide-y divide-gray-200"></tbody>
                     </table>
+                </div>
+
+                <div class="flex items-center gap-3 mb-4">
+                    <label class="text-sm font-medium text-gray-700 whitespace-nowrap">정산 월</label>
+                    <input type="month" id="settleMonth"
+                           class="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                    <span class="text-xs text-gray-400">계산 결과가 브라우저에 저장되어 전월과 자동 비교됩니다.</span>
                 </div>
 
                 <button id="calculateBtn"
@@ -102,6 +119,7 @@
                         <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white">
                             <p class="text-sm opacity-90 mb-1">전체 지급액 (부가세 포함)</p>
                             <p class="text-2xl font-bold" id="totalPayout">0원</p>
+                            <p class="text-xs mt-1 opacity-90" id="payoutDelta"></p>
                         </div>
                     </div>
 
@@ -114,6 +132,7 @@
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">광고비 (공급가)</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">정산액 (공급가)</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">지급액 (부가세 포함)</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">전월대비</th>
                                 </tr>
                             </thead>
                             <tbody id="summaryTableBody" class="bg-white divide-y divide-gray-200"></tbody>
@@ -145,6 +164,35 @@
         let parsedRows = null;
         // key = "고객사|||매체사"  value = { accountName, media, feeRate, defaultSettlePct }
         let rowMeta = new Map();
+
+        // ===== 브라우저 저장 (이력 / 예외 정산율 기억) =====
+        const HISTORY_KEY  = 'settlementHistory';
+        const OVERRIDE_KEY = 'settleRateOverrides';
+
+        function loadJSON(key) {
+            try { return JSON.parse(localStorage.getItem(key)) || {}; }
+            catch (e) { return {}; }
+        }
+
+        function prevMonthEntry(month) {
+            const history = loadJSON(HISTORY_KEY);
+            let [y, m] = month.split('-').map(Number);
+            for (let i = 0; i < 12; i++) {
+                m -= 1;
+                if (m === 0) { m = 12; y -= 1; }
+                const label = y + '-' + String(m).padStart(2, '0');
+                if (history[label]) return { label, data: history[label] };
+            }
+            return null;
+        }
+
+        // 정산 월 기본값: 지난달 (보통 전월분을 정산하므로)
+        (function () {
+            const d = new Date();
+            d.setMonth(d.getMonth() - 1);
+            document.getElementById('settleMonth').value =
+                d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        })();
 
         analyzeBtn.addEventListener('click', handleAnalyze);
         calculateBtn.addEventListener('click', handleCalculate);
@@ -224,23 +272,25 @@
             const tbody = document.getElementById('rateTableBody');
             tbody.innerHTML = '';
             let prevAccount = null;
+            const savedOverrides = loadJSON(OVERRIDE_KEY);  // 지난번 수정한 예외 정산율 자동 적용
 
             for (const [key, { accountName, media, feeRate, defaultSettlePct }] of meta) {
                 const feeRatePct = Math.round(feeRate * 100);
                 const tr = document.createElement('tr');
-                tr.className = 'hover:bg-gray-50';
+                tr.className = 'hover:bg-gray-50 transition-colors';
+                tr.dataset.search = (accountName + ' ' + media).toLowerCase();
+                tr.dataset.key = key;
 
-                // 고객사 (같은 회사 연속이면 화살표로)
+                // 고객사 (같은 회사 연속이면 연하게)
                 const accountTd = document.createElement('td');
                 accountTd.className = 'px-4 py-2.5 text-sm';
                 if (accountName !== prevAccount) {
-                    accountTd.className += ' font-semibold text-gray-800 border-t-2 border-gray-100';
-                    accountTd.textContent = accountName;
+                    accountTd.className += ' font-semibold text-gray-800';
                     prevAccount = accountName;
                 } else {
-                    accountTd.className += ' text-gray-400';
-                    accountTd.textContent = '↳';
+                    accountTd.className += ' text-gray-300';
                 }
+                accountTd.textContent = accountName;
 
                 // 매체사
                 const mediaTd = document.createElement('td');
@@ -257,35 +307,107 @@
                 badge.textContent = feeRatePct + '%';
                 feeTd.appendChild(badge);
 
-                // 정산율 입력
+                // 정산율: 원클릭 버튼 + 직접 입력
                 const settleTd = document.createElement('td');
-                settleTd.className = 'px-4 py-2.5 text-center';
+                settleTd.className = 'px-4 py-2.5';
+                const wrap = document.createElement('div');
+                wrap.className = 'flex items-center justify-center gap-1.5';
+
+                const presets = feeRatePct === 9 ? [5] : [10, 12];
                 const input = document.createElement('input');
                 input.type = 'number';
                 input.min = '0';
                 input.max = '100';
                 input.step = '0.1';
-                input.value = defaultSettlePct;
+                input.value = savedOverrides[key] ?? defaultSettlePct;
                 input.dataset.key = key;
-                input.className = 'settle-input w-20 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-400';
+                input.className = 'settle-input w-16 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-400';
+                input.addEventListener('input', () => refreshRowState(tr, input));
+
+                presets.forEach(p => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.dataset.preset = p;
+                    btn.textContent = p + '%';
+                    btn.className = 'preset-btn px-2 py-1 rounded text-xs font-bold border transition';
+                    btn.addEventListener('click', () => {
+                        input.value = p;
+                        refreshRowState(tr, input);
+                    });
+                    wrap.appendChild(btn);
+                });
+
                 const unit = document.createElement('span');
-                unit.className = 'ml-1 text-sm text-gray-500';
+                unit.className = 'text-sm text-gray-500';
                 unit.textContent = '%';
-                settleTd.appendChild(input);
-                settleTd.appendChild(unit);
+                wrap.appendChild(input);
+                wrap.appendChild(unit);
+                settleTd.appendChild(wrap);
 
                 tr.appendChild(accountTd);
                 tr.appendChild(mediaTd);
                 tr.appendChild(feeTd);
                 tr.appendChild(settleTd);
                 tbody.appendChild(tr);
+                refreshRowState(tr, input);
             }
+
+            document.getElementById('rateSearch').value = '';
+            updateExceptionCount();
         }
+
+        // 수정 여부에 따라 행 하이라이트 + 버튼 활성 표시
+        function refreshRowState(tr, input) {
+            const meta = rowMeta.get(input.dataset.key);
+            if (!meta) return;
+            const val = parseFloat(input.value);
+            const isException = !isNaN(val) && val !== meta.defaultSettlePct;
+
+            tr.classList.toggle('bg-amber-50', isException);
+            input.classList.toggle('border-amber-400', isException);
+            input.classList.toggle('bg-amber-50', isException);
+            input.classList.toggle('font-bold', isException);
+            input.classList.toggle('text-amber-700', isException);
+
+            tr.querySelectorAll('.preset-btn').forEach(btn => {
+                const active = parseFloat(btn.dataset.preset) === val;
+                btn.className = 'preset-btn px-2 py-1 rounded text-xs font-bold border transition ' +
+                    (active
+                        ? (parseFloat(btn.dataset.preset) === meta.defaultSettlePct
+                            ? 'bg-green-600 border-green-600 text-white'
+                            : 'bg-amber-500 border-amber-500 text-white')
+                        : 'bg-white border-gray-300 text-gray-500 hover:border-gray-400');
+            });
+            updateExceptionCount();
+        }
+
+        function updateExceptionCount() {
+            let count = 0;
+            document.querySelectorAll('.settle-input').forEach(input => {
+                const meta = rowMeta.get(input.dataset.key);
+                if (meta && parseFloat(input.value) !== meta.defaultSettlePct) count++;
+            });
+            const el = document.getElementById('exceptionCount');
+            el.textContent = '예외 ' + count + '건';
+            el.className = count > 0
+                ? 'text-sm font-bold text-amber-600 whitespace-nowrap'
+                : 'text-sm text-gray-400 whitespace-nowrap';
+        }
+
+        document.getElementById('rateSearch').addEventListener('input', function () {
+            const q = this.value.trim().toLowerCase();
+            document.querySelectorAll('#rateTableBody tr').forEach(tr => {
+                tr.classList.toggle('hidden', q !== '' && !tr.dataset.search.includes(q));
+            });
+        });
 
         function resetSettlementRates() {
             document.querySelectorAll('.settle-input').forEach(input => {
                 const meta = rowMeta.get(input.dataset.key);
-                if (meta) input.value = meta.defaultSettlePct;
+                if (meta) {
+                    input.value = meta.defaultSettlePct;
+                    refreshRowState(input.closest('tr'), input);
+                }
             });
         }
 
@@ -308,7 +430,35 @@
             results.classList.add('hidden');
 
             try {
-                displayResults(calculateSettlement(parsedRows, settleRates));
+                const data = calculateSettlement(parsedRows, settleRates);
+
+                // 예외 정산율 기억 (다음 달 파일 분석 시 자동 적용)
+                const overrides = {};
+                for (const input of document.querySelectorAll('.settle-input')) {
+                    const meta = rowMeta.get(input.dataset.key);
+                    const val = parseFloat(input.value);
+                    if (meta && val !== meta.defaultSettlePct) overrides[input.dataset.key] = val;
+                }
+                localStorage.setItem(OVERRIDE_KEY, JSON.stringify(overrides));
+
+                // 이력 저장 + 전월 데이터 조회
+                const month = document.getElementById('settleMonth').value;
+                let prev = null;
+                if (month) {
+                    prev = prevMonthEntry(month);
+                    const history = loadJSON(HISTORY_KEY);
+                    history[month] = {
+                        totalAdCost: data.totalAdCost,
+                        totalSettlement: data.totalSettlement,
+                        totalPayout: data.totalPayout,
+                        accounts: Object.fromEntries(data.accounts.map(a =>
+                            [a.accountName, { amount: a.totalAmount, settlement: a.totalSettlement, payout: a.totalPayout }])),
+                        savedAt: new Date().toISOString()
+                    };
+                    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+                }
+
+                displayResults(data, prev);
             } catch (err) {
                 showError('계산 중 오류가 발생했습니다: ' + err.message);
             }
@@ -361,13 +511,28 @@
             };
         }
 
-        function displayResults(data) {
+        function formatDelta(diff) {
+            if (diff > 0) return `<span class="text-red-500 text-sm font-medium">▲ ${Math.floor(diff).toLocaleString('ko-KR')}원</span>`;
+            if (diff < 0) return `<span class="text-blue-500 text-sm font-medium">▼ ${Math.floor(-diff).toLocaleString('ko-KR')}원</span>`;
+            return `<span class="text-gray-400 text-sm">—</span>`;
+        }
+
+        function displayResults(data, prev) {
             document.getElementById('totalAdCost').textContent =
                 Math.floor(data.totalAdCost).toLocaleString('ko-KR') + '원';
             document.getElementById('totalSettlement').textContent =
                 Math.floor(data.totalSettlement).toLocaleString('ko-KR') + '원';
             document.getElementById('totalPayout').textContent =
                 Math.floor(data.totalPayout).toLocaleString('ko-KR') + '원';
+
+            const deltaEl = document.getElementById('payoutDelta');
+            if (prev) {
+                const diff = data.totalPayout - prev.data.totalPayout;
+                const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '—';
+                deltaEl.textContent = `${prev.label} 대비 ${arrow} ${Math.floor(Math.abs(diff)).toLocaleString('ko-KR')}원`;
+            } else {
+                deltaEl.textContent = '';
+            }
 
             const tbody = document.getElementById('summaryTableBody');
             tbody.innerHTML = '';
@@ -378,12 +543,22 @@
                 const rankClass = i === 0 ? 'text-yellow-600 font-bold' :
                                   i === 1 ? 'text-gray-400 font-bold' :
                                   i === 2 ? 'text-orange-600 font-bold' : '';
+
+                let deltaHtml = '<span class="text-gray-400 text-sm">—</span>';
+                if (prev) {
+                    const prevAcc = prev.data.accounts[acc.accountName];
+                    deltaHtml = prevAcc
+                        ? formatDelta(acc.totalPayout - prevAcc.payout)
+                        : '<span class="text-green-600 text-xs font-bold">신규</span>';
+                }
+
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap"><span class="${rankClass}">${i + 1}</span></td>
                     <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${escapeHtml(acc.accountName)}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-gray-900">${Math.floor(acc.totalAmount).toLocaleString('ko-KR')}원</td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-teal-600 font-medium">${Math.floor(acc.totalSettlement).toLocaleString('ko-KR')}원</td>
                     <td class="px-6 py-4 whitespace-nowrap text-right font-bold text-green-600">${Math.floor(acc.totalPayout).toLocaleString('ko-KR')}원</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right">${deltaHtml}</td>
                 `;
                 tbody.appendChild(row);
             });
