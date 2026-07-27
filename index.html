@@ -6,37 +6,53 @@
     <title>마케팅 정산 계산기</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; letter-spacing: -0.01em; }
+        table { font-variant-numeric: tabular-nums; }
+    </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-slate-50">
     <div class="min-h-screen py-8 px-4">
         <div class="max-w-6xl mx-auto">
 
-            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-                <div class="flex items-center mb-6">
-                    <i class="fas fa-calculator text-3xl text-blue-600 mr-3"></i>
-                    <h1 class="text-3xl font-bold text-gray-800">마케팅 정산 계산기</h1>
+            <div class="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6 mb-6">
+                <div class="flex items-center justify-between mb-7">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xl shadow-md shadow-blue-200">
+                            <i class="fas fa-calculator"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold text-slate-900">마케팅 정산 계산기</h1>
+                            <p class="text-sm text-slate-400 mt-0.5">파일을 올리면 고객사별 정산 금액을 자동으로 계산합니다</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="backupStatus" class="text-xs text-slate-400 mr-1"></span>
+                        <button id="backupBtn"
+                                class="text-xs font-medium text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 rounded-lg px-3.5 py-2 transition">
+                            <i class="fas fa-download mr-1.5"></i>백업 저장
+                        </button>
+                        <button id="restoreBtn"
+                                class="text-xs font-medium text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 rounded-lg px-3.5 py-2 transition">
+                            <i class="fas fa-upload mr-1.5"></i>백업 불러오기
+                        </button>
+                        <input type="file" id="restoreInput" accept=".json" class="hidden">
+                    </div>
                 </div>
 
-                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-                    <p class="text-sm text-gray-700">
-                        <i class="fas fa-info-circle mr-2"></i>
-                        엑셀 파일을 업로드하면 고객사별 정산 금액을 자동으로 계산합니다.
-                    </p>
+                <div id="dropZone"
+                     class="border-2 border-dashed border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 rounded-2xl px-6 py-12 text-center cursor-pointer transition">
+                    <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                        <i class="fas fa-file-excel text-2xl text-emerald-500"></i>
+                    </div>
+                    <p id="dropZoneText" class="text-slate-700 font-semibold">엑셀 파일을 클릭해서 선택하거나 여기로 끌어다 놓으세요</p>
+                    <p class="text-xs text-slate-400 mt-1.5">.xlsx · .xls &nbsp;|&nbsp; 선택하면 바로 분석됩니다</p>
                 </div>
+                <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden">
 
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        <i class="fas fa-file-excel mr-2"></i>엑셀 파일 선택
-                    </label>
-                    <input type="file" id="fileInput" accept=".xlsx,.xls"
-                           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                </div>
-
-                <button id="analyzeBtn"
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center">
-                    <i class="fas fa-search mr-2"></i>파일 분석
-                </button>
+                <button id="analyzeBtn" class="hidden"></button>
 
                 <div id="loading" class="hidden text-center py-8">
                     <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i>
@@ -49,9 +65,9 @@
             </div>
 
             <!-- 정산율 확인 및 수정 -->
-            <div id="rateSection" class="hidden bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div id="rateSection" class="hidden bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6 mb-6">
                 <div class="flex items-center justify-between mb-2">
-                    <h2 class="text-xl font-bold text-gray-800">
+                    <h2 class="text-xl font-bold text-slate-900">
                         <i class="fas fa-sliders-h mr-2"></i>정산율 확인 및 수정
                     </h2>
                     <button id="resetBtn"
@@ -60,44 +76,117 @@
                     </button>
                 </div>
                 <p class="text-sm text-gray-500 mb-4">
-                    수수료율 기준으로 정산율이 자동 설정됩니다. 예외가 있는 항목만 직접 수정하세요.
+                    수수료율 기준으로 정산율이 자동 설정됩니다. (14% → 10%, 9% → 5%)
+                    예외가 있는 회사만 버튼으로 바꾸거나 직접 입력하세요.
                 </p>
 
-                <div class="overflow-x-auto mb-6">
+                <div id="verifyBanner" class="hidden text-sm rounded-lg px-4 py-3 mb-3"></div>
+
+                <div id="unnamedPanel" class="hidden"></div>
+
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="relative flex-1">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                        <input type="text" id="rateSearch" placeholder="고객사 또는 매체사 검색"
+                               class="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    </div>
+                    <span id="exceptionCount" class="text-sm text-gray-400 whitespace-nowrap">예외 0건</span>
+                    <button id="mergeBtn"
+                            class="text-xs text-gray-400 hover:text-blue-600 underline whitespace-nowrap">회사 합치기</button>
+                    <button id="clearMemoryBtn"
+                            class="text-xs text-gray-400 hover:text-red-500 underline whitespace-nowrap">기억된 예외 지우기</button>
+                </div>
+
+                <div id="mergePanel" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-4 mb-3">
+                    <p class="text-xs text-slate-500 mb-3">
+                        <i class="fas fa-link mr-1"></i>
+                        같은 회사가 다른 이름으로 표기된 경우 하나로 합칩니다. 합치면 정산액도 합산되고, 다음 달부터 자동 적용됩니다.
+                    </p>
+                    <div class="flex flex-wrap items-center gap-2 mb-3">
+                        <select id="mergeFrom"
+                                class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"></select>
+                        <span class="text-slate-400 text-sm font-bold">→</span>
+                        <select id="mergeInto"
+                                class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"></select>
+                        <button id="mergeApply"
+                                class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg px-4 py-2 transition">
+                            합치기
+                        </button>
+                    </div>
+                    <div id="mergeList" class="flex flex-wrap gap-2"></div>
+                </div>
+
+                <div class="overflow-x-auto mb-6 max-h-96 overflow-y-auto border border-gray-100 rounded-lg">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead class="bg-gray-50">
+                        <thead class="bg-gray-50 sticky top-0 z-10">
                             <tr>
-                                <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">고객사</th>
-                                <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">매체사</th>
-                                <th class="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider w-28">수수료율</th>
-                                <th class="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider w-36">정산율 (%)</th>
+                                <th class="px-4 py-3 text-left font-medium text-slate-400 uppercase tracking-wider">고객사</th>
+                                <th class="px-4 py-3 text-left font-medium text-slate-400 uppercase tracking-wider">매체사</th>
+                                <th class="px-4 py-3 text-center font-medium text-slate-400 uppercase tracking-wider w-28">수수료율</th>
+                                <th class="px-4 py-3 text-center font-medium text-slate-400 uppercase tracking-wider w-36">정산율 (%)</th>
                             </tr>
                         </thead>
                         <tbody id="rateTableBody" class="bg-white divide-y divide-gray-200"></tbody>
                     </table>
                 </div>
 
+                <div class="flex items-center gap-3 mb-4">
+                    <label class="text-sm font-medium text-gray-700 whitespace-nowrap">정산 월</label>
+                    <input type="month" id="settleMonth"
+                           class="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                    <span class="text-xs text-gray-400">계산 결과가 브라우저에 저장되어 전월과 자동 비교됩니다.</span>
+                </div>
+
                 <button id="calculateBtn"
-                        class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center">
+                        class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md shadow-blue-200 transition duration-200 flex items-center justify-center">
                     <i class="fas fa-calculator mr-2"></i>정산 계산하기
                 </button>
             </div>
 
             <!-- 결과 -->
             <div id="results" class="hidden">
-                <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-4">
-                        <i class="fas fa-chart-bar mr-2"></i>정산 결과
-                    </h2>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                        <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
-                            <p class="text-sm opacity-90 mb-1">전체 광고비</p>
-                            <p class="text-3xl font-bold" id="totalAdCost">0원</p>
+                <div class="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6 mb-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-2xl font-bold text-slate-900">
+                            <i class="fas fa-chart-bar mr-2"></i>정산 결과
+                        </h2>
+                        <div class="flex items-center gap-3">
+                            <span id="sentCount" class="text-sm text-gray-500"></span>
+                            <button id="csvBtn"
+                                    class="text-sm text-gray-600 hover:text-blue-600 border border-gray-300 hover:border-blue-400 rounded px-3 py-1.5 transition">
+                                <i class="fas fa-download mr-1"></i>CSV 다운로드
+                            </button>
                         </div>
-                        <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white">
-                            <p class="text-sm opacity-90 mb-1">전체 정산 금액</p>
-                            <p class="text-3xl font-bold" id="totalSettlement">0원</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-white rounded-2xl border border-slate-200/70 p-5 flex items-center gap-4">
+                            <div class="w-11 h-11 shrink-0 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center">
+                                <i class="fas fa-bullhorn"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs text-slate-400 mb-0.5">전체 광고비 (공급가)</p>
+                                <p class="text-xl font-bold text-slate-900 truncate" id="totalAdCost">0원</p>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-2xl border border-slate-200/70 p-5 flex items-center gap-4">
+                            <div class="w-11 h-11 shrink-0 rounded-xl bg-teal-50 text-teal-500 flex items-center justify-center">
+                                <i class="fas fa-percent"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs text-slate-400 mb-0.5">전체 정산액 (공급가 기준)</p>
+                                <p class="text-xl font-bold text-slate-900 truncate" id="totalSettlement">0원</p>
+                            </div>
+                        </div>
+                        <div class="rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 p-5 flex items-center gap-4 text-white shadow-md shadow-emerald-200">
+                            <div class="w-11 h-11 shrink-0 rounded-xl bg-white/20 flex items-center justify-center">
+                                <i class="fas fa-won-sign"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs text-emerald-50 mb-0.5">전체 지급액 (부가세 포함)</p>
+                                <p class="text-xl font-bold truncate" id="totalPayout">0원</p>
+                                <p class="text-[11px] mt-0.5 text-emerald-100" id="payoutDelta"></p>
+                            </div>
                         </div>
                     </div>
 
@@ -105,10 +194,14 @@
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">순위</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">고객사 계정명</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">광고비 합계</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">정산 금액</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">순위</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">고객사 계정명</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">광고비 (공급가)</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">정산액 (공급가)</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">지급액 (부가세 포함)</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">전월대비</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">안내문</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">진행 상태</th>
                                 </tr>
                             </thead>
                             <tbody id="summaryTableBody" class="bg-white divide-y divide-gray-200"></tbody>
@@ -116,8 +209,8 @@
                     </div>
                 </div>
 
-                <div id="detailsCard" class="hidden bg-white rounded-lg shadow-lg p-6">
-                    <h3 class="text-xl font-bold text-gray-800 mb-4">
+                <div id="detailsCard" class="hidden bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6">
+                    <h3 class="text-xl font-bold text-slate-900 mb-4">
                         <i class="fas fa-list mr-2"></i>상세 내역
                     </h3>
                     <div id="detailsContent"></div>
@@ -126,6 +219,15 @@
 
         </div>
     </div>
+
+    <datalist id="titleOptions">
+        <option value="대표님"></option>
+        <option value="팀장님"></option>
+        <option value="실장님"></option>
+        <option value="과장님"></option>
+        <option value="매니저님"></option>
+        <option value="담당자님"></option>
+    </datalist>
 
     <script>
         const fileInput  = document.getElementById('fileInput');
@@ -141,9 +243,76 @@
         // key = "고객사|||매체사"  value = { accountName, media, feeRate, defaultSettlePct }
         let rowMeta = new Map();
 
+        // ===== 브라우저 저장 (이력 / 예외 정산율 기억) =====
+        const HISTORY_KEY  = 'settlementHistory';
+        // 예외 정산율은 "고객사@수수료율" 단위로 기억 (예: "빌록(BILOC)@14": 12)
+        // → 같은 회사에 새 매체사가 추가돼도 자동으로 예외 정산율이 적용됨
+        const OVERRIDE_KEY = 'settleRateOverridesV2';
+
+        function overrideKey(accountName, feeRatePct) {
+            return accountName + '@' + feeRatePct;
+        }
+
+        function loadJSON(key) {
+            try { return JSON.parse(localStorage.getItem(key)) || {}; }
+            catch (e) { return {}; }
+        }
+
+        function prevMonthEntry(month) {
+            const history = loadJSON(HISTORY_KEY);
+            let [y, m] = month.split('-').map(Number);
+            for (let i = 0; i < 12; i++) {
+                m -= 1;
+                if (m === 0) { m = 12; y -= 1; }
+                const label = y + '-' + String(m).padStart(2, '0');
+                if (history[label]) return { label, data: history[label] };
+            }
+            return null;
+        }
+
+        // 정산 월 기본값: 지난달 (보통 전월분을 정산하므로)
+        (function () {
+            const d = new Date();
+            d.setMonth(d.getMonth() - 1);
+            document.getElementById('settleMonth').value =
+                d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        })();
+
         analyzeBtn.addEventListener('click', handleAnalyze);
         calculateBtn.addEventListener('click', handleCalculate);
         resetBtn.addEventListener('click', () => resetSettlementRates());
+        // 파일을 선택하면 바로 자동 분석
+        fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleAnalyze(); });
+
+        // 드래그 & 드롭 업로드
+        const dropZone = document.getElementById('dropZone');
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', e => {
+            e.preventDefault();
+            dropZone.classList.add('border-blue-400', 'bg-blue-50/40');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-blue-400', 'bg-blue-50/40');
+        });
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-400', 'bg-blue-50/40');
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                handleAnalyze();
+            }
+        });
+
+        // 파일명에서 정산 월 자동 인식 (예: "26년 05월", "2026-05")
+        function detectMonthFromFilename(name) {
+            let m = name.match(/(?:20)?(\d{2})\s*년[\s_.-]*(\d{1,2})\s*월/);
+            if (m) return '20' + m[1] + '-' + String(parseInt(m[2], 10)).padStart(2, '0');
+            m = name.match(/20(\d{2})[\s_.-]?(0[1-9]|1[0-2])(?:\D|$)/);
+            if (m) return '20' + m[1] + '-' + m[2];
+            m = name.match(/(?:^|\D)(2\d)[^0-9]{1,4}(0[1-9]|1[0-2])(?:\D|$)/);
+            if (m) return '20' + m[1] + '-' + m[2];
+            return null;
+        }
 
         async function handleAnalyze() {
             const file = fileInput.files[0];
@@ -166,8 +335,22 @@
                 parsedRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
                 rowMeta = buildRowMeta(parsedRows);
+                if (rowMeta.size === 0) {
+                    showError('파일에서 정산 데이터를 찾지 못했습니다. 파일 양식이 바뀌었는지 확인해주세요.');
+                    return;
+                }
                 renderRateTable(rowMeta);
+                renderVerifyBanner(verifyTotals(parsedRows));
+                renderUnnamedPanel(collectUnnamed(parsedRows));
+
+                const detected = detectMonthFromFilename(file.name);
+                if (detected) document.getElementById('settleMonth').value = detected;
+
+                document.getElementById('dropZoneText').innerHTML =
+                    '<i class="fas fa-check-circle text-emerald-500 mr-1.5"></i>' + escapeHtml(file.name);
+
                 rateSection.classList.remove('hidden');
+                rateSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } catch (err) {
                 showError('파일 처리 중 오류가 발생했습니다: ' + err.message);
             } finally {
@@ -181,20 +364,69 @@
         }
 
         function readRow(row) {
-            if (!row || row.length < 11) return null;
-            const media       = row[0];   // A열: 매체사
-            const accountName = row[6];   // G열: 계정명(고객사)
-            const amount      = parseFloat(row[9]);   // J열: 합계금액(광고비)
-            const feeRate     = parseFloat(row[10]);  // K열: 수수료율
+            if (!row || row.length < 10) return null;
+            // 시트 범위가 B열부터 시작 → 인덱스 0 = B열
+            const media       = row[0];  // B열: 매체사
+            let accountName = row[5];    // G열: 계정명(고객사)
+            // 계정명이 없는('-') 행은 수동 지정된 회사명 사용 (계정번호 기준 저장)
+            if (!accountName || accountName === '-') {
+                accountName = loadJSON(UNNAMED_KEY)[unnamedKey(row)] || accountName;
+            }
+            accountName = resolveAccount(accountName);  // 합쳐진 회사는 대표 이름으로
+            const supply      = parseFloat(row[6]);  // H열: 공급가(부가세 제외 광고비)
+            const feeRate     = parseFloat(row[9]);  // K열: 수수료율
             if (!media || !accountName || accountName === '-' ||
-                isNaN(amount) || isNaN(feeRate)) return null;
+                isNaN(supply) || isNaN(feeRate)) return null;
             if (typeof media === 'string' && media.includes('합')) return null;
-            return { media, accountName, amount, feeRate };
+            return { media, accountName, supply, feeRate };
         }
 
         function defaultSettlePct(feeRate) {
             if (Math.abs(feeRate - 0.09) < 0.001) return 5;
             return 10;
+        }
+
+        // ===== 파일 검증: 시트의 "합계" 행과 프로그램이 읽은 합계를 대조 =====
+        function verifyTotals(rows) {
+            let parsedSum = 0, sheetTotal = null, excludedSum = 0, excludedCount = 0;
+            for (let i = 3; i < rows.length; i++) {
+                const r = readRow(rows[i]);
+                if (r) { parsedSum += r.supply; continue; }
+                const row = rows[i];
+                if (!row) continue;
+                const isTotal = typeof row[0] === 'string' && row[0].includes('합');
+                const h = parseFloat(row[6]);
+                if (isTotal) {
+                    if (!isNaN(h) && sheetTotal === null) sheetTotal = h;
+                } else if (!isNaN(h) && h !== 0) {
+                    // 계정명이 '-' 등으로 비어 있어 정산 대상에서 제외된, 금액 있는 행
+                    excludedSum += h;
+                    excludedCount++;
+                }
+            }
+            return { parsedSum, sheetTotal, excludedSum, excludedCount };
+        }
+
+        function renderVerifyBanner({ parsedSum, sheetTotal, excludedSum, excludedCount }) {
+            const el = document.getElementById('verifyBanner');
+            el.classList.remove('hidden');
+            const fmt = n => Math.floor(n).toLocaleString('ko-KR') + '원';
+            if (sheetTotal === null) {
+                el.className = 'text-sm rounded-lg px-4 py-3 mb-3 bg-amber-50 text-amber-700 border border-amber-200';
+                el.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>시트에서 합계 행을 찾지 못해 검증을 건너뛰었습니다. 결과 숫자를 한 번 확인해주세요.';
+            } else if (Math.abs(parsedSum - sheetTotal) < 1) {
+                el.className = 'text-sm rounded-lg px-4 py-3 mb-3 bg-green-50 text-green-700 border border-green-200';
+                el.innerHTML = '<i class="fas fa-check-circle mr-2"></i>검증 완료: 파일 합계와 일치합니다 (공급가 ' + fmt(sheetTotal) + ')';
+            } else if (Math.abs(parsedSum + excludedSum - sheetTotal) < 1) {
+                el.className = 'text-sm rounded-lg px-4 py-3 mb-3 bg-blue-50 text-blue-700 border border-blue-200';
+                el.innerHTML = '<i class="fas fa-info-circle mr-2"></i>검증 완료: 다만 계정명이 없는(\'-\') ' + excludedCount + '개 행(공급가 ' + fmt(excludedSum) +
+                    ')은 고객사를 알 수 없어 정산에서 제외했습니다. 나머지는 파일 합계와 일치합니다.';
+            } else {
+                el.className = 'text-sm rounded-lg px-4 py-3 mb-3 bg-red-50 text-red-700 border border-red-300 font-medium';
+                el.innerHTML = '<i class="fas fa-exclamation-circle mr-2"></i>⚠ 합계가 다릅니다! 시트 합계 ' + fmt(sheetTotal) +
+                    ' vs 계산된 합계 ' + fmt(parsedSum) +
+                    ' — 파일 양식이 바뀌었을 수 있으니 결과를 쓰기 전에 확인하세요.';
+            }
         }
 
         function buildRowMeta(rows) {
@@ -218,23 +450,25 @@
             const tbody = document.getElementById('rateTableBody');
             tbody.innerHTML = '';
             let prevAccount = null;
+            const savedOverrides = loadJSON(OVERRIDE_KEY);  // 지난번 수정한 예외 정산율 자동 적용
 
             for (const [key, { accountName, media, feeRate, defaultSettlePct }] of meta) {
                 const feeRatePct = Math.round(feeRate * 100);
                 const tr = document.createElement('tr');
-                tr.className = 'hover:bg-gray-50';
+                tr.className = 'hover:bg-gray-50 transition-colors';
+                tr.dataset.search = (accountName + ' ' + media).toLowerCase();
+                tr.dataset.key = key;
 
-                // 고객사 (같은 회사 연속이면 화살표로)
+                // 고객사 (같은 회사 연속이면 연하게)
                 const accountTd = document.createElement('td');
                 accountTd.className = 'px-4 py-2.5 text-sm';
                 if (accountName !== prevAccount) {
-                    accountTd.className += ' font-semibold text-gray-800 border-t-2 border-gray-100';
-                    accountTd.textContent = accountName;
+                    accountTd.className += ' font-semibold text-gray-800';
                     prevAccount = accountName;
                 } else {
-                    accountTd.className += ' text-gray-400';
-                    accountTd.textContent = '↳';
+                    accountTd.className += ' text-gray-300';
                 }
+                accountTd.textContent = accountName;
 
                 // 매체사
                 const mediaTd = document.createElement('td');
@@ -251,35 +485,288 @@
                 badge.textContent = feeRatePct + '%';
                 feeTd.appendChild(badge);
 
-                // 정산율 입력
+                // 정산율: 원클릭 버튼 + 직접 입력
                 const settleTd = document.createElement('td');
-                settleTd.className = 'px-4 py-2.5 text-center';
+                settleTd.className = 'px-4 py-2.5';
+                const wrap = document.createElement('div');
+                wrap.className = 'flex items-center justify-center gap-1.5';
+
+                const presets = feeRatePct === 9 ? [5] : [10, 12];
                 const input = document.createElement('input');
                 input.type = 'number';
                 input.min = '0';
                 input.max = '100';
                 input.step = '0.1';
-                input.value = defaultSettlePct;
+                input.value = savedOverrides[overrideKey(accountName, feeRatePct)] ?? defaultSettlePct;
                 input.dataset.key = key;
-                input.className = 'settle-input w-20 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-400';
+                input.className = 'settle-input w-16 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-400';
+                input.addEventListener('input', () => refreshRowState(tr, input));
+
+                presets.forEach(p => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.dataset.preset = p;
+                    btn.textContent = p + '%';
+                    btn.className = 'preset-btn px-2 py-1 rounded text-xs font-bold border transition';
+                    btn.addEventListener('click', () => {
+                        input.value = p;
+                        refreshRowState(tr, input);
+                    });
+                    wrap.appendChild(btn);
+                });
+
                 const unit = document.createElement('span');
-                unit.className = 'ml-1 text-sm text-gray-500';
+                unit.className = 'text-sm text-gray-500';
                 unit.textContent = '%';
-                settleTd.appendChild(input);
-                settleTd.appendChild(unit);
+                wrap.appendChild(input);
+                wrap.appendChild(unit);
+                settleTd.appendChild(wrap);
 
                 tr.appendChild(accountTd);
                 tr.appendChild(mediaTd);
                 tr.appendChild(feeTd);
                 tr.appendChild(settleTd);
                 tbody.appendChild(tr);
+                refreshRowState(tr, input);
             }
+
+            document.getElementById('rateSearch').value = '';
+            updateExceptionCount();
         }
+
+        // 수정 여부에 따라 행 하이라이트 + 버튼 활성 표시
+        function refreshRowState(tr, input) {
+            const meta = rowMeta.get(input.dataset.key);
+            if (!meta) return;
+            const val = parseFloat(input.value);
+            const isException = !isNaN(val) && val !== meta.defaultSettlePct;
+
+            tr.classList.toggle('bg-amber-50', isException);
+            input.classList.toggle('border-amber-400', isException);
+            input.classList.toggle('bg-amber-50', isException);
+            input.classList.toggle('font-bold', isException);
+            input.classList.toggle('text-amber-700', isException);
+
+            tr.querySelectorAll('.preset-btn').forEach(btn => {
+                const active = parseFloat(btn.dataset.preset) === val;
+                btn.className = 'preset-btn px-2 py-1 rounded text-xs font-bold border transition ' +
+                    (active
+                        ? (parseFloat(btn.dataset.preset) === meta.defaultSettlePct
+                            ? 'bg-green-600 border-green-600 text-white'
+                            : 'bg-amber-500 border-amber-500 text-white')
+                        : 'bg-white border-gray-300 text-gray-500 hover:border-gray-400');
+            });
+            updateExceptionCount();
+        }
+
+        function updateExceptionCount() {
+            let count = 0;
+            document.querySelectorAll('.settle-input').forEach(input => {
+                const meta = rowMeta.get(input.dataset.key);
+                if (meta && parseFloat(input.value) !== meta.defaultSettlePct) count++;
+            });
+            const el = document.getElementById('exceptionCount');
+            el.textContent = '예외 ' + count + '건';
+            el.className = count > 0
+                ? 'text-sm font-bold text-amber-600 whitespace-nowrap'
+                : 'text-sm text-gray-400 whitespace-nowrap';
+        }
+
+        document.getElementById('rateSearch').addEventListener('input', function () {
+            const q = this.value.trim().toLowerCase();
+            document.querySelectorAll('#rateTableBody tr').forEach(tr => {
+                tr.classList.toggle('hidden', q !== '' && !tr.dataset.search.includes(q));
+            });
+        });
+
+        // ===== 계정명 없는 행: 회사명 수동 지정 (계정번호 기준 저장) =====
+        const UNNAMED_KEY = 'unnamedAccounts';
+
+        function unnamedKey(row) {
+            // D열(계정ID) + F열(AdAccountNo)로 행을 식별 → 다음 달에도 같은 계정이면 자동 적용
+            return (row[2] ?? '') + '#' + (row[4] ?? '');
+        }
+
+        function collectUnnamed(rows) {
+            const list = [];
+            const assigned = loadJSON(UNNAMED_KEY);
+            for (let i = 3; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row) continue;
+                const media = row[0];
+                if (!media || (typeof media === 'string' && media.includes('합'))) continue;
+                const supply = parseFloat(row[6]);
+                const feeRate = parseFloat(row[9]);
+                if (isNaN(supply) || isNaN(feeRate) || supply === 0) continue;
+                const name = row[5];
+                if (name && name !== '-') continue;
+                const key = unnamedKey(row);
+                list.push({
+                    key,
+                    media: String(media),
+                    accountId: String(row[2] || row[4] || ''),
+                    supply,
+                    assigned: assigned[key] || ''
+                });
+            }
+            return list;
+        }
+
+        function renderUnnamedPanel(list) {
+            const panel = document.getElementById('unnamedPanel');
+            panel.innerHTML = '';
+            if (list.length === 0) {
+                panel.classList.add('hidden');
+                return;
+            }
+            panel.classList.remove('hidden');
+            panel.className = 'bg-amber-50 border border-amber-200 rounded-xl p-4 mb-3';
+            const head = document.createElement('p');
+            head.className = 'text-sm text-amber-800 font-medium mb-3';
+            head.innerHTML = '<i class="fas fa-pen mr-1.5"></i>계정명이 없는 행이 ' + list.length +
+                '개 있습니다. 회사명을 입력하면 정산에 포함되고, 다음 달에도 자동 적용됩니다.';
+            panel.appendChild(head);
+
+            list.forEach(u => {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'flex flex-wrap items-center gap-3 bg-white border border-amber-100 rounded-lg px-3 py-2 mb-2 text-sm';
+
+                const mediaSpan = document.createElement('span');
+                mediaSpan.className = 'text-slate-600';
+                mediaSpan.textContent = u.media;
+
+                const idSpan = document.createElement('span');
+                idSpan.className = 'text-xs text-slate-400';
+                idSpan.textContent = u.accountId;
+
+                const amtSpan = document.createElement('span');
+                amtSpan.className = 'ml-auto text-slate-700 font-medium';
+                amtSpan.textContent = Math.floor(u.supply).toLocaleString('ko-KR') + '원';
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.placeholder = '회사명 입력';
+                input.value = u.assigned;
+                input.className = 'border rounded-lg px-3 py-1.5 text-sm w-44 focus:outline-none focus:ring-2 focus:ring-amber-400 ' +
+                    (u.assigned ? 'border-emerald-300 bg-emerald-50' : 'border-slate-300');
+                input.addEventListener('change', () => {
+                    const map = loadJSON(UNNAMED_KEY);
+                    const v = input.value.trim();
+                    if (v) map[u.key] = v;
+                    else delete map[u.key];
+                    localStorage.setItem(UNNAMED_KEY, JSON.stringify(map));
+                    reprocess();
+                });
+
+                rowDiv.appendChild(mediaSpan);
+                rowDiv.appendChild(idSpan);
+                rowDiv.appendChild(amtSpan);
+                rowDiv.appendChild(input);
+                panel.appendChild(rowDiv);
+            });
+        }
+
+        // 저장 데이터 변경 후 표/검증/패널을 다시 계산
+        function reprocess() {
+            if (!parsedRows) return;
+            rowMeta = buildRowMeta(parsedRows);
+            renderRateTable(rowMeta);
+            renderVerifyBanner(verifyTotals(parsedRows));
+            renderUnnamedPanel(collectUnnamed(parsedRows));
+            results.classList.add('hidden');
+        }
+
+        // ===== 회사 합치기 (별칭) =====
+        // { "빌록": "빌록(BILOC)" } → 빌록으로 표기된 행을 전부 빌록(BILOC)으로 취급
+        const ALIAS_KEY = 'companyAliases';
+
+        function resolveAccount(name) {
+            if (!name) return name;
+            const map = loadJSON(ALIAS_KEY);
+            let n = name, i = 0;
+            while (map[n] && map[n] !== n && i++ < 5) n = map[n];
+            return n;
+        }
+
+        document.getElementById('mergeBtn').addEventListener('click', () => {
+            const panel = document.getElementById('mergePanel');
+            panel.classList.toggle('hidden');
+            if (!panel.classList.contains('hidden')) refreshMergeUI();
+        });
+
+        function refreshMergeUI() {
+            const companies = [...new Set([...rowMeta.values()].map(m => m.accountName))].sort();
+            const fromSel = document.getElementById('mergeFrom');
+            const intoSel = document.getElementById('mergeInto');
+            fromSel.innerHTML = '';
+            intoSel.innerHTML = '';
+            companies.forEach(c => {
+                fromSel.appendChild(new Option(c, c));
+                intoSel.appendChild(new Option(c, c));
+            });
+
+            const list = document.getElementById('mergeList');
+            list.innerHTML = '';
+            const entries = Object.entries(loadJSON(ALIAS_KEY));
+            if (entries.length === 0) {
+                list.innerHTML = '<span class="text-xs text-slate-400">합쳐진 회사가 없습니다.</span>';
+                return;
+            }
+            entries.forEach(([from, to]) => {
+                const chip = document.createElement('span');
+                chip.className = 'inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-full px-3 py-1.5 text-xs text-slate-600';
+                chip.textContent = from + ' → ' + to;
+                const x = document.createElement('button');
+                x.innerHTML = '<i class="fas fa-times"></i>';
+                x.className = 'text-slate-300 hover:text-red-500 ml-1';
+                x.title = '합치기 해제';
+                x.addEventListener('click', () => {
+                    const m = loadJSON(ALIAS_KEY);
+                    delete m[from];
+                    localStorage.setItem(ALIAS_KEY, JSON.stringify(m));
+                    reprocessAfterMerge();
+                });
+                chip.appendChild(x);
+                list.appendChild(chip);
+            });
+        }
+
+        document.getElementById('mergeApply').addEventListener('click', () => {
+            const from = document.getElementById('mergeFrom').value;
+            const into = document.getElementById('mergeInto').value;
+            if (!from || !into || from === into) {
+                alert('서로 다른 두 회사를 선택해주세요.');
+                return;
+            }
+            const map = loadJSON(ALIAS_KEY);
+            map[from] = into;
+            // from을 가리키던 기존 별칭도 최종 대상으로 정리
+            for (const k of Object.keys(map)) {
+                if (map[k] === from) map[k] = into;
+                if (map[k] === k) delete map[k];
+            }
+            localStorage.setItem(ALIAS_KEY, JSON.stringify(map));
+            reprocessAfterMerge();
+        });
+
+        function reprocessAfterMerge() {
+            reprocess();
+            refreshMergeUI();
+        }
+
+        document.getElementById('clearMemoryBtn').addEventListener('click', () => {
+            if (!confirm('기억된 예외 정산율을 모두 지울까요? (예: 빌록 12%)')) return;
+            localStorage.removeItem(OVERRIDE_KEY);
+            if (rowMeta.size > 0) renderRateTable(rowMeta);
+        });
 
         function resetSettlementRates() {
             document.querySelectorAll('.settle-input').forEach(input => {
                 const meta = rowMeta.get(input.dataset.key);
-                if (meta) input.value = meta.defaultSettlePct;
+                if (meta) {
+                    input.value = meta.defaultSettlePct;
+                    refreshRowState(input.closest('tr'), input);
+                }
             });
         }
 
@@ -302,7 +789,45 @@
             results.classList.add('hidden');
 
             try {
-                displayResults(calculateSettlement(parsedRows, settleRates));
+                const data = calculateSettlement(parsedRows, settleRates);
+
+                // 예외 정산율을 회사 단위로 기억 (다음 달 새 매체사가 생겨도 자동 적용)
+                // 파일에 없는 회사의 기존 기억은 유지
+                const overrides = loadJSON(OVERRIDE_KEY);
+                const seen = {};
+                for (const input of document.querySelectorAll('.settle-input')) {
+                    const meta = rowMeta.get(input.dataset.key);
+                    if (!meta) continue;
+                    const val = parseFloat(input.value);
+                    const okey = overrideKey(meta.accountName, Math.round(meta.feeRate * 100));
+                    if (val !== meta.defaultSettlePct) seen[okey] = val;
+                    else if (!(okey in seen)) seen[okey] = null;
+                }
+                for (const [okey, val] of Object.entries(seen)) {
+                    if (val === null) delete overrides[okey];
+                    else overrides[okey] = val;
+                }
+                localStorage.setItem(OVERRIDE_KEY, JSON.stringify(overrides));
+
+                // 이력 저장 + 전월 데이터 조회
+                const month = document.getElementById('settleMonth').value;
+                let prev = null;
+                if (month) {
+                    prev = prevMonthEntry(month);
+                    const history = loadJSON(HISTORY_KEY);
+                    history[month] = {
+                        totalAdCost: data.totalAdCost,
+                        totalSettlement: data.totalSettlement,
+                        totalPayout: data.totalPayout,
+                        accounts: Object.fromEntries(data.accounts.map(a =>
+                            [a.accountName, { amount: a.totalAmount, settlement: a.totalSettlement, payout: a.totalPayout }])),
+                        savedAt: new Date().toISOString()
+                    };
+                    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+                }
+
+                displayResults(data, prev);
+                autoBackup();
             } catch (err) {
                 showError('계산 중 오류가 발생했습니다: ' + err.message);
             }
@@ -317,25 +842,30 @@
 
                 const key = makeKey(r.accountName, r.media);
                 const settlementRate = settleRates.get(key) ?? defaultSettlePct(r.feeRate) / 100;
-                const settlement = r.amount * settlementRate;
+                // 정산액 = 공급가(부가세 제외) × 정산율, 지급액 = 정산액 × 1.1 (부가세 포함)
+                const settlement = r.supply * settlementRate;
+                const payout = settlement * 1.1;
 
                 if (!accountMap.has(r.accountName)) {
                     accountMap.set(r.accountName, {
                         accountName: r.accountName,
                         totalAmount: 0,
                         totalSettlement: 0,
+                        totalPayout: 0,
                         details: []
                     });
                 }
                 const acc = accountMap.get(r.accountName);
-                acc.totalAmount += r.amount;
+                acc.totalAmount += r.supply;
                 acc.totalSettlement += settlement;
+                acc.totalPayout += payout;
                 acc.details.push({
                     media: r.media,
                     feeRatePct: Math.round(r.feeRate * 100),
                     settlePct: settlementRate * 100,
-                    amount: r.amount,
-                    settlement
+                    amount: r.supply,
+                    settlement,
+                    payout
                 });
             }
 
@@ -345,15 +875,33 @@
             return {
                 accounts,
                 totalAdCost: accounts.reduce((s, a) => s + a.totalAmount, 0),
-                totalSettlement: accounts.reduce((s, a) => s + a.totalSettlement, 0)
+                totalSettlement: accounts.reduce((s, a) => s + a.totalSettlement, 0),
+                totalPayout: accounts.reduce((s, a) => s + a.totalPayout, 0)
             };
         }
 
-        function displayResults(data) {
+        function formatDelta(diff) {
+            if (diff > 0) return `<span class="text-red-500 text-sm font-medium">▲ ${Math.floor(diff).toLocaleString('ko-KR')}원</span>`;
+            if (diff < 0) return `<span class="text-blue-500 text-sm font-medium">▼ ${Math.floor(-diff).toLocaleString('ko-KR')}원</span>`;
+            return `<span class="text-gray-400 text-sm">—</span>`;
+        }
+
+        function displayResults(data, prev) {
             document.getElementById('totalAdCost').textContent =
                 Math.floor(data.totalAdCost).toLocaleString('ko-KR') + '원';
             document.getElementById('totalSettlement').textContent =
                 Math.floor(data.totalSettlement).toLocaleString('ko-KR') + '원';
+            document.getElementById('totalPayout').textContent =
+                Math.floor(data.totalPayout).toLocaleString('ko-KR') + '원';
+
+            const deltaEl = document.getElementById('payoutDelta');
+            if (prev) {
+                const diff = data.totalPayout - prev.data.totalPayout;
+                const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '—';
+                deltaEl.textContent = `${prev.label} 대비 ${arrow} ${Math.floor(Math.abs(diff)).toLocaleString('ko-KR')}원`;
+            } else {
+                deltaEl.textContent = '';
+            }
 
             const tbody = document.getElementById('summaryTableBody');
             tbody.innerHTML = '';
@@ -364,17 +912,180 @@
                 const rankClass = i === 0 ? 'text-yellow-600 font-bold' :
                                   i === 1 ? 'text-gray-400 font-bold' :
                                   i === 2 ? 'text-orange-600 font-bold' : '';
+
+                let deltaHtml = '<span class="text-gray-400 text-sm">—</span>';
+                if (prev) {
+                    const prevAcc = prev.data.accounts[acc.accountName];
+                    deltaHtml = prevAcc
+                        ? formatDelta(acc.totalPayout - prevAcc.payout)
+                        : '<span class="text-green-600 text-xs font-bold">신규</span>';
+                }
+
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap"><span class="${rankClass}">${i + 1}</span></td>
                     <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${escapeHtml(acc.accountName)}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-gray-900">${Math.floor(acc.totalAmount).toLocaleString('ko-KR')}원</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right font-bold text-green-600">${Math.floor(acc.totalSettlement).toLocaleString('ko-KR')}원</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-teal-600 font-medium">${Math.floor(acc.totalSettlement).toLocaleString('ko-KR')}원</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right font-bold text-green-600">${Math.floor(acc.totalPayout).toLocaleString('ko-KR')}원</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right">${deltaHtml}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                        <div class="flex items-center justify-center gap-1.5">
+                            <input type="text" class="title-input w-20 border border-gray-200 rounded px-2 py-1.5 text-xs text-center text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                   list="titleOptions" title="안내문에 들어갈 호칭">
+                            <button class="copy-btn text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded px-2.5 py-1.5 transition font-medium">
+                                <i class="fas fa-copy mr-1"></i>복사
+                            </button>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                        <button class="sent-btn" data-account="${escapeHtml(acc.accountName)}"></button>
+                    </td>
                 `;
+                const titleInput = row.querySelector('.title-input');
+                titleInput.value = getTitle(acc.accountName);
+                titleInput.addEventListener('click', e => e.stopPropagation());
+                titleInput.addEventListener('input', () => setTitle(acc.accountName, titleInput.value));
+                row.querySelector('.copy-btn').addEventListener('click', e => {
+                    e.stopPropagation();
+                    setTitle(acc.accountName, titleInput.value);
+                    copyNotice(acc, e.currentTarget);
+                });
+                const sentBtn = row.querySelector('.sent-btn');
+                renderSentBadge(sentBtn, getStatus(acc.accountName));
+                sentBtn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const next = { none: 'sent', sent: 'invoiced', invoiced: 'none' };
+                    setStatus(acc.accountName, next[getStatus(acc.accountName)]);
+                    refreshSentUI(acc.accountName);
+                });
                 tbody.appendChild(row);
             });
 
             results.classList.remove('hidden');
             if (data.accounts.length > 0) showDetails(data.accounts[0]);
+            lastResults = data;
+            updateSentCount();
+        }
+
+        // ===== CSV 다운로드 =====
+        let lastResults = null;
+        document.getElementById('csvBtn').addEventListener('click', () => {
+            if (!lastResults) return;
+            const month = document.getElementById('settleMonth').value || '';
+            let csv = '﻿고객사,광고비(공급가),정산액(공급가),지급액(부가세 포함)\n';
+            lastResults.accounts.forEach(a => {
+                csv += `"${a.accountName.replace(/"/g, '""')}",${Math.floor(a.totalAmount)},${Math.floor(a.totalSettlement)},${Math.floor(a.totalPayout)}\n`;
+            });
+            csv += `합계,${Math.floor(lastResults.totalAdCost)},${Math.floor(lastResults.totalSettlement)},${Math.floor(lastResults.totalPayout)}\n`;
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+            a.download = '정산결과' + (month ? '_' + month : '') + '.csv';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        });
+
+        // ===== 담당자 호칭 (회사별, 브라우저 저장) =====
+        const TITLE_KEY = 'recipientTitles';
+        const DEFAULT_TITLE = '대표님';
+
+        function getTitle(accountName) {
+            return loadJSON(TITLE_KEY)[accountName] || DEFAULT_TITLE;
+        }
+
+        function setTitle(accountName, title) {
+            const all = loadJSON(TITLE_KEY);
+            const t = (title || '').trim();
+            if (!t || t === DEFAULT_TITLE) delete all[accountName];
+            else all[accountName] = t;
+            localStorage.setItem(TITLE_KEY, JSON.stringify(all));
+        }
+
+        // ===== 정산 안내문 생성 (카톡 발송용) =====
+        function buildNotice(acc) {
+            const month = document.getElementById('settleMonth').value;
+            const monthLabel = month ? parseInt(month.split('-')[1], 10) + '월' : '이번 달';
+            const supply = Math.floor(acc.totalSettlement);
+            const vat = Math.floor(acc.totalSettlement * 0.1);
+            const total = supply + vat;
+            return `안녕하세요 ${getTitle(acc.accountName)}, 좋은 아침입니다!\n\n` +
+                `${monthLabel} 정산 진행 도와드리겠습니다. ` +
+                `세금계산서로 진행 도와드리는 형태로 페이백 비용은 부가세 포함 ${total.toLocaleString('ko-KR')}원 입니다.\n` +
+                `(공급가 ${supply.toLocaleString('ko-KR')}원 + 부가세 ${vat.toLocaleString('ko-KR')}원)\n\n` +
+                `세금계산서 처리 해주시면 월말 정산 도와드리겠습니다 :)`;
+        }
+
+        // ===== 진행 상태 (월별 / 고객사별, 브라우저 저장) =====
+        // 미발송(none) → 안내 발송(sent) → 계산서 수령(invoiced), 클릭할 때마다 순환
+        const SENT_KEY = 'sentStatus';
+
+        function currentMonthKey() {
+            return document.getElementById('settleMonth').value || 'no-month';
+        }
+
+        function getStatus(accountName) {
+            const v = (loadJSON(SENT_KEY)[currentMonthKey()] || {})[accountName];
+            if (!v) return 'none';
+            if (v === 'invoiced' || v.status === 'invoiced') return 'invoiced';
+            return 'sent';
+        }
+
+        function setStatus(accountName, status) {
+            const all = loadJSON(SENT_KEY);
+            const monthKey = currentMonthKey();
+            if (!all[monthKey]) all[monthKey] = {};
+            if (status === 'none') delete all[monthKey][accountName];
+            else all[monthKey][accountName] = { status, at: new Date().toISOString() };
+            localStorage.setItem(SENT_KEY, JSON.stringify(all));
+        }
+
+        function renderSentBadge(btn, status) {
+            const styles = {
+                none:     ['미발송', 'bg-gray-100 text-gray-400 hover:bg-gray-200'],
+                sent:     ['<i class="fas fa-paper-plane mr-1"></i>안내 발송', 'bg-blue-100 text-blue-700 hover:bg-blue-200'],
+                invoiced: ['<i class="fas fa-check-circle mr-1"></i>계산서 수령', 'bg-green-100 text-green-700 hover:bg-green-200']
+            };
+            const [label, cls] = styles[status];
+            btn.innerHTML = label;
+            btn.className = 'sent-btn text-xs font-bold rounded-full px-3 py-1.5 transition whitespace-nowrap ' + cls;
+        }
+
+        function updateSentCount() {
+            if (!lastResults) return;
+            const total = lastResults.accounts.length;
+            let sent = 0, invoiced = 0;
+            lastResults.accounts.forEach(a => {
+                const s = getStatus(a.accountName);
+                if (s !== 'none') sent++;
+                if (s === 'invoiced') invoiced++;
+            });
+            const el = document.getElementById('sentCount');
+            el.textContent = `안내 ${sent}/${total} · 계산서 ${invoiced}/${total}`;
+            el.className = invoiced === total && total > 0
+                ? 'text-sm font-bold text-green-600'
+                : 'text-sm text-gray-500';
+        }
+
+        async function copyNotice(acc, btn) {
+            try {
+                await navigator.clipboard.writeText(buildNotice(acc));
+            } catch (e) {
+                alert(buildNotice(acc));
+            }
+            // 복사하면 자동으로 "안내 발송" 처리 (이미 계산서 수령 상태면 유지)
+            if (getStatus(acc.accountName) === 'none') setStatus(acc.accountName, 'sent');
+            refreshSentUI(acc.accountName);
+            if (btn) {
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check mr-1"></i>복사됨';
+                setTimeout(() => { btn.innerHTML = orig; }, 1200);
+            }
+        }
+
+        function refreshSentUI(accountName) {
+            document.querySelectorAll('.sent-btn[data-account]').forEach(btn => {
+                if (btn.dataset.account === accountName) renderSentBadge(btn, getStatus(accountName));
+            });
+            updateSentCount();
         }
 
         function showDetails(acc) {
@@ -382,10 +1093,17 @@
             const detailsContent = document.getElementById('detailsContent');
 
             let html = `
-                <div class="mb-4">
-                    <h4 class="text-lg font-bold text-gray-800">${escapeHtml(acc.accountName)}</h4>
-                    <p class="text-sm text-gray-600">총 광고비: ${Math.floor(acc.totalAmount).toLocaleString('ko-KR')}원</p>
-                    <p class="text-sm font-bold text-green-600">총 정산액: ${Math.floor(acc.totalSettlement).toLocaleString('ko-KR')}원</p>
+                <div class="mb-4 flex items-start justify-between gap-4">
+                    <div>
+                        <h4 class="text-lg font-bold text-slate-900">${escapeHtml(acc.accountName)}</h4>
+                        <p class="text-sm text-gray-600">총 광고비 (공급가): ${Math.floor(acc.totalAmount).toLocaleString('ko-KR')}원</p>
+                        <p class="text-sm text-teal-600 font-medium">총 정산액 (공급가 기준): ${Math.floor(acc.totalSettlement).toLocaleString('ko-KR')}원</p>
+                        <p class="text-sm font-bold text-green-600">총 지급액 (부가세 포함): ${Math.floor(acc.totalPayout).toLocaleString('ko-KR')}원</p>
+                    </div>
+                    <button id="noticeBtn"
+                            class="shrink-0 text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-2 transition font-medium">
+                        <i class="fas fa-copy mr-1"></i>정산 안내문 복사
+                    </button>
                 </div>
                 <div class="space-y-2">
             `;
@@ -404,8 +1122,9 @@
                             </div>
                         </div>
                         <div class="text-sm text-gray-600">
-                            <p>광고비: ${Math.floor(d.amount).toLocaleString('ko-KR')}원</p>
-                            <p class="font-bold text-green-600">정산액: ${Math.floor(d.settlement).toLocaleString('ko-KR')}원</p>
+                            <p>광고비 (공급가): ${Math.floor(d.amount).toLocaleString('ko-KR')}원</p>
+                            <p class="text-teal-600">정산액 (공급가 기준): ${Math.floor(d.settlement).toLocaleString('ko-KR')}원</p>
+                            <p class="font-bold text-green-600">지급액 (부가세 포함): ${Math.floor(d.payout).toLocaleString('ko-KR')}원</p>
                         </div>
                     </div>
                 `;
@@ -414,7 +1133,79 @@
             html += '</div>';
             detailsContent.innerHTML = html;
             detailsCard.classList.remove('hidden');
+
+            document.getElementById('noticeBtn')
+                .addEventListener('click', e => copyNotice(acc, e.currentTarget));
         }
+
+        // ===== 백업 저장 / 불러오기 =====
+        const BACKUP_KEYS = ['settlementHistory', 'settleRateOverridesV2', 'recipientTitles', 'sentStatus', 'companyAliases', 'unnamedAccounts'];
+
+        const LAST_BACKUP_KEY = 'lastBackupDate';
+
+        function downloadBackup() {
+            const backup = { app: '마케팅 정산 계산기', version: 1, exportedAt: new Date().toISOString(), data: {} };
+            BACKUP_KEYS.forEach(k => { backup.data[k] = loadJSON(k); });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
+            a.download = '정산백업_' + new Date().toISOString().slice(0, 10) + '.json';
+            a.click();
+            URL.revokeObjectURL(a.href);
+            localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString().slice(0, 10));
+            renderBackupStatus();
+        }
+
+        // 계산할 때마다 자동 백업 (하루 한 번까지만 → 다운로드 폴더가 지저분해지지 않게)
+        function autoBackup() {
+            const today = new Date().toISOString().slice(0, 10);
+            if (localStorage.getItem(LAST_BACKUP_KEY) === today) return;
+            downloadBackup();
+        }
+
+        function renderBackupStatus() {
+            const last = localStorage.getItem(LAST_BACKUP_KEY);
+            const el = document.getElementById('backupStatus');
+            if (!last) { el.textContent = ''; return; }
+            const today = new Date().toISOString().slice(0, 10);
+            el.textContent = last === today ? '오늘 백업됨' : '마지막 백업 ' + last;
+            el.className = last === today
+                ? 'text-xs text-emerald-600 mr-1'
+                : 'text-xs text-slate-400 mr-1';
+        }
+        renderBackupStatus();
+
+        document.getElementById('backupBtn').addEventListener('click', downloadBackup);
+
+        document.getElementById('restoreBtn').addEventListener('click', () => {
+            document.getElementById('restoreInput').click();
+        });
+
+        document.getElementById('restoreInput').addEventListener('change', async function () {
+            const file = this.files[0];
+            this.value = '';
+            if (!file) return;
+            try {
+                const backup = JSON.parse(await file.text());
+                if (!backup || !backup.data) throw new Error('형식이 올바르지 않습니다.');
+                let count = 0;
+                BACKUP_KEYS.forEach(k => {
+                    if (backup.data[k] && typeof backup.data[k] === 'object') {
+                        localStorage.setItem(k, JSON.stringify(backup.data[k]));
+                        count++;
+                    }
+                });
+                if (count === 0) throw new Error('불러올 데이터가 없습니다.');
+                if (rowMeta.size > 0) renderRateTable(rowMeta);
+                if (lastResults) {
+                    document.querySelectorAll('.sent-btn[data-account]').forEach(btn =>
+                        renderSentBadge(btn, getStatus(btn.dataset.account)));
+                    updateSentCount();
+                }
+                alert('백업을 불러왔습니다. (이력 · 예외 정산율 · 호칭 · 진행 상태 복원 완료)');
+            } catch (e) {
+                alert('백업 파일을 불러오지 못했습니다: ' + e.message);
+            }
+        });
 
         function showError(message) {
             error.querySelector('p').textContent = message;
