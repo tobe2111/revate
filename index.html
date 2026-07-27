@@ -29,6 +29,7 @@
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
+                        <span id="backupStatus" class="text-xs text-slate-400 mr-1"></span>
                         <button id="backupBtn"
                                 class="text-xs font-medium text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 rounded-lg px-3.5 py-2 transition">
                             <i class="fas fa-download mr-1.5"></i>백업 저장
@@ -419,7 +420,7 @@
             } else if (Math.abs(parsedSum + excludedSum - sheetTotal) < 1) {
                 el.className = 'text-sm rounded-lg px-4 py-3 mb-3 bg-blue-50 text-blue-700 border border-blue-200';
                 el.innerHTML = '<i class="fas fa-info-circle mr-2"></i>검증 완료: 다만 계정명이 없는(\'-\') ' + excludedCount + '개 행(공급가 ' + fmt(excludedSum) +
-                    ')은 고객사를 알 수 없어 정산에서 제외했습니다. 아래에서 회사명을 입력하면 정산에 포함됩니다.';
+                    ')은 고객사를 알 수 없어 정산에서 제외했습니다. 나머지는 파일 합계와 일치합니다.';
             } else {
                 el.className = 'text-sm rounded-lg px-4 py-3 mb-3 bg-red-50 text-red-700 border border-red-300 font-medium';
                 el.innerHTML = '<i class="fas fa-exclamation-circle mr-2"></i>⚠ 합계가 다릅니다! 시트 합계 ' + fmt(sheetTotal) +
@@ -826,6 +827,7 @@
                 }
 
                 displayResults(data, prev);
+                autoBackup();
             } catch (err) {
                 showError('계산 중 오류가 발생했습니다: ' + err.message);
             }
@@ -1139,7 +1141,9 @@
         // ===== 백업 저장 / 불러오기 =====
         const BACKUP_KEYS = ['settlementHistory', 'settleRateOverridesV2', 'recipientTitles', 'sentStatus', 'companyAliases', 'unnamedAccounts'];
 
-        document.getElementById('backupBtn').addEventListener('click', () => {
+        const LAST_BACKUP_KEY = 'lastBackupDate';
+
+        function downloadBackup() {
             const backup = { app: '마케팅 정산 계산기', version: 1, exportedAt: new Date().toISOString(), data: {} };
             BACKUP_KEYS.forEach(k => { backup.data[k] = loadJSON(k); });
             const a = document.createElement('a');
@@ -1147,7 +1151,30 @@
             a.download = '정산백업_' + new Date().toISOString().slice(0, 10) + '.json';
             a.click();
             URL.revokeObjectURL(a.href);
-        });
+            localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString().slice(0, 10));
+            renderBackupStatus();
+        }
+
+        // 계산할 때마다 자동 백업 (하루 한 번까지만 → 다운로드 폴더가 지저분해지지 않게)
+        function autoBackup() {
+            const today = new Date().toISOString().slice(0, 10);
+            if (localStorage.getItem(LAST_BACKUP_KEY) === today) return;
+            downloadBackup();
+        }
+
+        function renderBackupStatus() {
+            const last = localStorage.getItem(LAST_BACKUP_KEY);
+            const el = document.getElementById('backupStatus');
+            if (!last) { el.textContent = ''; return; }
+            const today = new Date().toISOString().slice(0, 10);
+            el.textContent = last === today ? '오늘 백업됨' : '마지막 백업 ' + last;
+            el.className = last === today
+                ? 'text-xs text-emerald-600 mr-1'
+                : 'text-xs text-slate-400 mr-1';
+        }
+        renderBackupStatus();
+
+        document.getElementById('backupBtn').addEventListener('click', downloadBackup);
 
         document.getElementById('restoreBtn').addEventListener('click', () => {
             document.getElementById('restoreInput').click();
@@ -1174,7 +1201,7 @@
                         renderSentBadge(btn, getStatus(btn.dataset.account)));
                     updateSentCount();
                 }
-                alert('백업을 불러왔습니다. (이력 · 예외 정산율 · 호칭 · 진행 상태 · 회사 합치기 복원 완료)');
+                alert('백업을 불러왔습니다. (이력 · 예외 정산율 · 호칭 · 진행 상태 복원 완료)');
             } catch (e) {
                 alert('백업 파일을 불러오지 못했습니다: ' + e.message);
             }
