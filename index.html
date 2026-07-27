@@ -107,10 +107,13 @@
                         <h2 class="text-2xl font-bold text-gray-800">
                             <i class="fas fa-chart-bar mr-2"></i>정산 결과
                         </h2>
-                        <button id="csvBtn"
-                                class="text-sm text-gray-600 hover:text-blue-600 border border-gray-300 hover:border-blue-400 rounded px-3 py-1.5 transition">
-                            <i class="fas fa-download mr-1"></i>CSV 다운로드
-                        </button>
+                        <div class="flex items-center gap-3">
+                            <span id="sentCount" class="text-sm text-gray-500"></span>
+                            <button id="csvBtn"
+                                    class="text-sm text-gray-600 hover:text-blue-600 border border-gray-300 hover:border-blue-400 rounded px-3 py-1.5 transition">
+                                <i class="fas fa-download mr-1"></i>CSV 다운로드
+                            </button>
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -139,6 +142,8 @@
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">정산액 (공급가)</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">지급액 (부가세 포함)</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">전월대비</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">안내문</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">발송</th>
                                 </tr>
                             </thead>
                             <tbody id="summaryTableBody" class="bg-white divide-y divide-gray-200"></tbody>
@@ -583,13 +588,33 @@
                     <td class="px-6 py-4 whitespace-nowrap text-right text-teal-600 font-medium">${Math.floor(acc.totalSettlement).toLocaleString('ko-KR')}원</td>
                     <td class="px-6 py-4 whitespace-nowrap text-right font-bold text-green-600">${Math.floor(acc.totalPayout).toLocaleString('ko-KR')}원</td>
                     <td class="px-6 py-4 whitespace-nowrap text-right">${deltaHtml}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                        <button class="copy-btn text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded px-2.5 py-1.5 transition font-medium">
+                            <i class="fas fa-copy mr-1"></i>복사
+                        </button>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                        <button class="sent-btn" data-account="${escapeHtml(acc.accountName)}"></button>
+                    </td>
                 `;
+                row.querySelector('.copy-btn').addEventListener('click', e => {
+                    e.stopPropagation();
+                    copyNotice(acc, e.currentTarget);
+                });
+                const sentBtn = row.querySelector('.sent-btn');
+                renderSentBadge(sentBtn, isSent(acc.accountName));
+                sentBtn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    setSent(acc.accountName, !isSent(acc.accountName));
+                    refreshSentUI(acc.accountName);
+                });
                 tbody.appendChild(row);
             });
 
             results.classList.remove('hidden');
             if (data.accounts.length > 0) showDetails(data.accounts[0]);
             lastResults = data;
+            updateSentCount();
         }
 
         // ===== CSV 다운로드 =====
@@ -609,17 +634,83 @@
             URL.revokeObjectURL(a.href);
         });
 
-        // ===== 정산 안내문 생성 =====
+        // ===== 정산 안내문 생성 (카톡 발송용) =====
         function buildNotice(acc) {
             const month = document.getElementById('settleMonth').value;
             const monthLabel = month ? parseInt(month.split('-')[1], 10) + '월' : '이번 달';
             const supply = Math.floor(acc.totalSettlement);
             const vat = Math.floor(acc.totalSettlement * 0.1);
             const total = supply + vat;
-            return `안녕하세요!\n${monthLabel} 정산 진행 도와드리겠습니다.\n` +
-                `세금계산서로 진행되며, 페이백 비용은\n` +
-                `공급가 ${supply.toLocaleString('ko-KR')}원 + 부가세 ${vat.toLocaleString('ko-KR')}원 = 총 ${total.toLocaleString('ko-KR')}원(부가세 포함) 입니다.\n\n` +
-                `위 금액으로 세금계산서 발행해주시면 정산 도와드리겠습니다 :)`;
+            return `안녕하세요 대표님, 좋은 아침입니다!\n\n` +
+                `${monthLabel} 정산 진행 도와드리겠습니다. ` +
+                `세금계산서로 진행 도와드리는 형태로 페이백 비용은 부가세 포함 ${total.toLocaleString('ko-KR')}원 입니다.\n` +
+                `(공급가 ${supply.toLocaleString('ko-KR')}원 + 부가세 ${vat.toLocaleString('ko-KR')}원)\n\n` +
+                `세금계산서 처리 해주시면 월말 정산 도와드리겠습니다 :)`;
+        }
+
+        // ===== 발송 상태 (월별 / 고객사별, 브라우저 저장) =====
+        const SENT_KEY = 'sentStatus';
+
+        function currentMonthKey() {
+            return document.getElementById('settleMonth').value || 'no-month';
+        }
+
+        function isSent(accountName) {
+            const all = loadJSON(SENT_KEY);
+            return !!(all[currentMonthKey()] || {})[accountName];
+        }
+
+        function setSent(accountName, sent) {
+            const all = loadJSON(SENT_KEY);
+            const monthKey = currentMonthKey();
+            if (!all[monthKey]) all[monthKey] = {};
+            if (sent) all[monthKey][accountName] = new Date().toISOString();
+            else delete all[monthKey][accountName];
+            localStorage.setItem(SENT_KEY, JSON.stringify(all));
+        }
+
+        function renderSentBadge(btn, sent) {
+            btn.innerHTML = sent
+                ? '<i class="fas fa-check-circle mr-1"></i>발송됨'
+                : '미발송';
+            btn.className = 'sent-btn text-xs font-bold rounded-full px-3 py-1.5 transition ' +
+                (sent
+                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200');
+        }
+
+        function updateSentCount() {
+            if (!lastResults) return;
+            const sent = lastResults.accounts.filter(a => isSent(a.accountName)).length;
+            const total = lastResults.accounts.length;
+            const el = document.getElementById('sentCount');
+            el.textContent = `발송 ${sent}/${total}`;
+            el.className = sent === total && total > 0
+                ? 'text-sm font-bold text-green-600'
+                : 'text-sm text-gray-500';
+        }
+
+        async function copyNotice(acc, btn) {
+            try {
+                await navigator.clipboard.writeText(buildNotice(acc));
+            } catch (e) {
+                alert(buildNotice(acc));
+            }
+            // 복사 = 발송 준비 완료로 간주하고 자동 체크
+            setSent(acc.accountName, true);
+            refreshSentUI(acc.accountName);
+            if (btn) {
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check mr-1"></i>복사됨';
+                setTimeout(() => { btn.innerHTML = orig; }, 1200);
+            }
+        }
+
+        function refreshSentUI(accountName) {
+            document.querySelectorAll('.sent-btn[data-account]').forEach(btn => {
+                if (btn.dataset.account === accountName) renderSentBadge(btn, isSent(accountName));
+            });
+            updateSentCount();
         }
 
         function showDetails(acc) {
@@ -668,20 +759,8 @@
             detailsContent.innerHTML = html;
             detailsCard.classList.remove('hidden');
 
-            const noticeBtn = document.getElementById('noticeBtn');
-            noticeBtn.addEventListener('click', async () => {
-                try {
-                    await navigator.clipboard.writeText(buildNotice(acc));
-                    noticeBtn.innerHTML = '<i class="fas fa-check mr-1"></i>복사 완료!';
-                    noticeBtn.classList.add('bg-green-50', 'text-green-700', 'border-green-200');
-                    setTimeout(() => {
-                        noticeBtn.innerHTML = '<i class="fas fa-copy mr-1"></i>정산 안내문 복사';
-                        noticeBtn.classList.remove('bg-green-50', 'text-green-700', 'border-green-200');
-                    }, 1500);
-                } catch (e) {
-                    alert(buildNotice(acc));
-                }
-            });
+            document.getElementById('noticeBtn')
+                .addEventListener('click', e => copyNotice(acc, e.currentTarget));
         }
 
         function showError(message) {
