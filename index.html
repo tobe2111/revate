@@ -103,9 +103,15 @@
             <!-- 결과 -->
             <div id="results" class="hidden">
                 <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-4">
-                        <i class="fas fa-chart-bar mr-2"></i>정산 결과
-                    </h2>
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-2xl font-bold text-gray-800">
+                            <i class="fas fa-chart-bar mr-2"></i>정산 결과
+                        </h2>
+                        <button id="csvBtn"
+                                class="text-sm text-gray-600 hover:text-blue-600 border border-gray-300 hover:border-blue-400 rounded px-3 py-1.5 transition">
+                            <i class="fas fa-download mr-1"></i>CSV 다운로드
+                        </button>
+                    </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
@@ -197,6 +203,19 @@
         analyzeBtn.addEventListener('click', handleAnalyze);
         calculateBtn.addEventListener('click', handleCalculate);
         resetBtn.addEventListener('click', () => resetSettlementRates());
+        // 파일을 선택하면 바로 자동 분석
+        fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleAnalyze(); });
+
+        // 파일명에서 정산 월 자동 인식 (예: "26년 05월", "2026-05")
+        function detectMonthFromFilename(name) {
+            let m = name.match(/(?:20)?(\d{2})\s*년[\s_.-]*(\d{1,2})\s*월/);
+            if (m) return '20' + m[1] + '-' + String(parseInt(m[2], 10)).padStart(2, '0');
+            m = name.match(/20(\d{2})[\s_.-]?(0[1-9]|1[0-2])(?:\D|$)/);
+            if (m) return '20' + m[1] + '-' + m[2];
+            m = name.match(/(?:^|\D)(2\d)[^0-9]{1,4}(0[1-9]|1[0-2])(?:\D|$)/);
+            if (m) return '20' + m[1] + '-' + m[2];
+            return null;
+        }
 
         async function handleAnalyze() {
             const file = fileInput.files[0];
@@ -220,7 +239,12 @@
 
                 rowMeta = buildRowMeta(parsedRows);
                 renderRateTable(rowMeta);
+
+                const detected = detectMonthFromFilename(file.name);
+                if (detected) document.getElementById('settleMonth').value = detected;
+
                 rateSection.classList.remove('hidden');
+                rateSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } catch (err) {
                 showError('파일 처리 중 오류가 발생했습니다: ' + err.message);
             } finally {
@@ -565,6 +589,37 @@
 
             results.classList.remove('hidden');
             if (data.accounts.length > 0) showDetails(data.accounts[0]);
+            lastResults = data;
+        }
+
+        // ===== CSV 다운로드 =====
+        let lastResults = null;
+        document.getElementById('csvBtn').addEventListener('click', () => {
+            if (!lastResults) return;
+            const month = document.getElementById('settleMonth').value || '';
+            let csv = '﻿고객사,광고비(공급가),정산액(공급가),지급액(부가세 포함)\n';
+            lastResults.accounts.forEach(a => {
+                csv += `"${a.accountName.replace(/"/g, '""')}",${Math.floor(a.totalAmount)},${Math.floor(a.totalSettlement)},${Math.floor(a.totalPayout)}\n`;
+            });
+            csv += `합계,${Math.floor(lastResults.totalAdCost)},${Math.floor(lastResults.totalSettlement)},${Math.floor(lastResults.totalPayout)}\n`;
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+            a.download = '정산결과' + (month ? '_' + month : '') + '.csv';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        });
+
+        // ===== 정산 안내문 생성 =====
+        function buildNotice(acc) {
+            const month = document.getElementById('settleMonth').value;
+            const monthLabel = month ? parseInt(month.split('-')[1], 10) + '월' : '이번 달';
+            const supply = Math.floor(acc.totalSettlement);
+            const vat = Math.floor(acc.totalSettlement * 0.1);
+            const total = supply + vat;
+            return `안녕하세요!\n${monthLabel} 정산 진행 도와드리겠습니다.\n` +
+                `세금계산서로 진행되며, 페이백 비용은\n` +
+                `공급가 ${supply.toLocaleString('ko-KR')}원 + 부가세 ${vat.toLocaleString('ko-KR')}원 = 총 ${total.toLocaleString('ko-KR')}원(부가세 포함) 입니다.\n\n` +
+                `위 금액으로 세금계산서 발행해주시면 정산 도와드리겠습니다 :)`;
         }
 
         function showDetails(acc) {
@@ -572,11 +627,17 @@
             const detailsContent = document.getElementById('detailsContent');
 
             let html = `
-                <div class="mb-4">
-                    <h4 class="text-lg font-bold text-gray-800">${escapeHtml(acc.accountName)}</h4>
-                    <p class="text-sm text-gray-600">총 광고비 (공급가): ${Math.floor(acc.totalAmount).toLocaleString('ko-KR')}원</p>
-                    <p class="text-sm text-teal-600 font-medium">총 정산액 (공급가 기준): ${Math.floor(acc.totalSettlement).toLocaleString('ko-KR')}원</p>
-                    <p class="text-sm font-bold text-green-600">총 지급액 (부가세 포함): ${Math.floor(acc.totalPayout).toLocaleString('ko-KR')}원</p>
+                <div class="mb-4 flex items-start justify-between gap-4">
+                    <div>
+                        <h4 class="text-lg font-bold text-gray-800">${escapeHtml(acc.accountName)}</h4>
+                        <p class="text-sm text-gray-600">총 광고비 (공급가): ${Math.floor(acc.totalAmount).toLocaleString('ko-KR')}원</p>
+                        <p class="text-sm text-teal-600 font-medium">총 정산액 (공급가 기준): ${Math.floor(acc.totalSettlement).toLocaleString('ko-KR')}원</p>
+                        <p class="text-sm font-bold text-green-600">총 지급액 (부가세 포함): ${Math.floor(acc.totalPayout).toLocaleString('ko-KR')}원</p>
+                    </div>
+                    <button id="noticeBtn"
+                            class="shrink-0 text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-2 transition font-medium">
+                        <i class="fas fa-copy mr-1"></i>정산 안내문 복사
+                    </button>
                 </div>
                 <div class="space-y-2">
             `;
@@ -606,6 +667,21 @@
             html += '</div>';
             detailsContent.innerHTML = html;
             detailsCard.classList.remove('hidden');
+
+            const noticeBtn = document.getElementById('noticeBtn');
+            noticeBtn.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(buildNotice(acc));
+                    noticeBtn.innerHTML = '<i class="fas fa-check mr-1"></i>복사 완료!';
+                    noticeBtn.classList.add('bg-green-50', 'text-green-700', 'border-green-200');
+                    setTimeout(() => {
+                        noticeBtn.innerHTML = '<i class="fas fa-copy mr-1"></i>정산 안내문 복사';
+                        noticeBtn.classList.remove('bg-green-50', 'text-green-700', 'border-green-200');
+                    }, 1500);
+                } catch (e) {
+                    alert(buildNotice(acc));
+                }
+            });
         }
 
         function showError(message) {
