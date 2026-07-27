@@ -6,50 +6,52 @@
     <title>마케팅 정산 계산기</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; letter-spacing: -0.01em; }
+        table { font-variant-numeric: tabular-nums; }
+    </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-slate-50">
     <div class="min-h-screen py-8 px-4">
         <div class="max-w-6xl mx-auto">
 
-            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center">
-                        <i class="fas fa-calculator text-3xl text-blue-600 mr-3"></i>
-                        <h1 class="text-3xl font-bold text-gray-800">마케팅 정산 계산기</h1>
+            <div class="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6 mb-6">
+                <div class="flex items-center justify-between mb-7">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xl shadow-md shadow-blue-200">
+                            <i class="fas fa-calculator"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold text-slate-900">마케팅 정산 계산기</h1>
+                            <p class="text-sm text-slate-400 mt-0.5">파일을 올리면 고객사별 정산 금액을 자동으로 계산합니다</p>
+                        </div>
                     </div>
                     <div class="flex items-center gap-2">
                         <button id="backupBtn"
-                                class="text-xs text-gray-500 hover:text-blue-600 border border-gray-300 hover:border-blue-400 rounded px-3 py-1.5 transition">
-                            <i class="fas fa-download mr-1"></i>백업 저장
+                                class="text-xs font-medium text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 rounded-lg px-3.5 py-2 transition">
+                            <i class="fas fa-download mr-1.5"></i>백업 저장
                         </button>
                         <button id="restoreBtn"
-                                class="text-xs text-gray-500 hover:text-blue-600 border border-gray-300 hover:border-blue-400 rounded px-3 py-1.5 transition">
-                            <i class="fas fa-upload mr-1"></i>백업 불러오기
+                                class="text-xs font-medium text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 rounded-lg px-3.5 py-2 transition">
+                            <i class="fas fa-upload mr-1.5"></i>백업 불러오기
                         </button>
                         <input type="file" id="restoreInput" accept=".json" class="hidden">
                     </div>
                 </div>
 
-                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-                    <p class="text-sm text-gray-700">
-                        <i class="fas fa-info-circle mr-2"></i>
-                        엑셀 파일을 선택하면 바로 분석됩니다. 고객사별 정산 금액을 자동으로 계산합니다.
-                    </p>
+                <div id="dropZone"
+                     class="border-2 border-dashed border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 rounded-2xl px-6 py-12 text-center cursor-pointer transition">
+                    <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                        <i class="fas fa-file-excel text-2xl text-emerald-500"></i>
+                    </div>
+                    <p id="dropZoneText" class="text-slate-700 font-semibold">엑셀 파일을 클릭해서 선택하거나 여기로 끌어다 놓으세요</p>
+                    <p class="text-xs text-slate-400 mt-1.5">.xlsx · .xls &nbsp;|&nbsp; 선택하면 바로 분석됩니다</p>
                 </div>
+                <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden">
 
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        <i class="fas fa-file-excel mr-2"></i>엑셀 파일 선택
-                    </label>
-                    <input type="file" id="fileInput" accept=".xlsx,.xls"
-                           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                </div>
-
-                <button id="analyzeBtn"
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center">
-                    <i class="fas fa-search mr-2"></i>파일 분석
-                </button>
+                <button id="analyzeBtn" class="hidden"></button>
 
                 <div id="loading" class="hidden text-center py-8">
                     <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i>
@@ -62,9 +64,9 @@
             </div>
 
             <!-- 정산율 확인 및 수정 -->
-            <div id="rateSection" class="hidden bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div id="rateSection" class="hidden bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6 mb-6">
                 <div class="flex items-center justify-between mb-2">
-                    <h2 class="text-xl font-bold text-gray-800">
+                    <h2 class="text-xl font-bold text-slate-900">
                         <i class="fas fa-sliders-h mr-2"></i>정산율 확인 및 수정
                     </h2>
                     <button id="resetBtn"
@@ -94,10 +96,10 @@
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50 sticky top-0 z-10">
                             <tr>
-                                <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">고객사</th>
-                                <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">매체사</th>
-                                <th class="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider w-28">수수료율</th>
-                                <th class="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider w-36">정산율 (%)</th>
+                                <th class="px-4 py-3 text-left font-medium text-slate-400 uppercase tracking-wider">고객사</th>
+                                <th class="px-4 py-3 text-left font-medium text-slate-400 uppercase tracking-wider">매체사</th>
+                                <th class="px-4 py-3 text-center font-medium text-slate-400 uppercase tracking-wider w-28">수수료율</th>
+                                <th class="px-4 py-3 text-center font-medium text-slate-400 uppercase tracking-wider w-36">정산율 (%)</th>
                             </tr>
                         </thead>
                         <tbody id="rateTableBody" class="bg-white divide-y divide-gray-200"></tbody>
@@ -112,16 +114,16 @@
                 </div>
 
                 <button id="calculateBtn"
-                        class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center">
+                        class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md shadow-blue-200 transition duration-200 flex items-center justify-center">
                     <i class="fas fa-calculator mr-2"></i>정산 계산하기
                 </button>
             </div>
 
             <!-- 결과 -->
             <div id="results" class="hidden">
-                <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <div class="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6 mb-6">
                     <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-2xl font-bold text-gray-800">
+                        <h2 class="text-2xl font-bold text-slate-900">
                             <i class="fas fa-chart-bar mr-2"></i>정산 결과
                         </h2>
                         <div class="flex items-center gap-3">
@@ -134,18 +136,33 @@
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
-                            <p class="text-sm opacity-90 mb-1">전체 광고비 (공급가)</p>
-                            <p class="text-2xl font-bold" id="totalAdCost">0원</p>
+                        <div class="bg-white rounded-2xl border border-slate-200/70 p-5 flex items-center gap-4">
+                            <div class="w-11 h-11 shrink-0 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center">
+                                <i class="fas fa-bullhorn"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs text-slate-400 mb-0.5">전체 광고비 (공급가)</p>
+                                <p class="text-xl font-bold text-slate-900 truncate" id="totalAdCost">0원</p>
+                            </div>
                         </div>
-                        <div class="bg-gradient-to-r from-teal-500 to-teal-600 rounded-lg p-6 text-white">
-                            <p class="text-sm opacity-90 mb-1">전체 정산액 (공급가 기준)</p>
-                            <p class="text-2xl font-bold" id="totalSettlement">0원</p>
+                        <div class="bg-white rounded-2xl border border-slate-200/70 p-5 flex items-center gap-4">
+                            <div class="w-11 h-11 shrink-0 rounded-xl bg-teal-50 text-teal-500 flex items-center justify-center">
+                                <i class="fas fa-percent"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs text-slate-400 mb-0.5">전체 정산액 (공급가 기준)</p>
+                                <p class="text-xl font-bold text-slate-900 truncate" id="totalSettlement">0원</p>
+                            </div>
                         </div>
-                        <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white">
-                            <p class="text-sm opacity-90 mb-1">전체 지급액 (부가세 포함)</p>
-                            <p class="text-2xl font-bold" id="totalPayout">0원</p>
-                            <p class="text-xs mt-1 opacity-90" id="payoutDelta"></p>
+                        <div class="rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 p-5 flex items-center gap-4 text-white shadow-md shadow-emerald-200">
+                            <div class="w-11 h-11 shrink-0 rounded-xl bg-white/20 flex items-center justify-center">
+                                <i class="fas fa-won-sign"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs text-emerald-50 mb-0.5">전체 지급액 (부가세 포함)</p>
+                                <p class="text-xl font-bold truncate" id="totalPayout">0원</p>
+                                <p class="text-[11px] mt-0.5 text-emerald-100" id="payoutDelta"></p>
+                            </div>
                         </div>
                     </div>
 
@@ -153,14 +170,14 @@
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">순위</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">고객사 계정명</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">광고비 (공급가)</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">정산액 (공급가)</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">지급액 (부가세 포함)</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">전월대비</th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">안내문</th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">진행 상태</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">순위</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">고객사 계정명</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">광고비 (공급가)</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">정산액 (공급가)</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">지급액 (부가세 포함)</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">전월대비</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">안내문</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">진행 상태</th>
                                 </tr>
                             </thead>
                             <tbody id="summaryTableBody" class="bg-white divide-y divide-gray-200"></tbody>
@@ -168,8 +185,8 @@
                     </div>
                 </div>
 
-                <div id="detailsCard" class="hidden bg-white rounded-lg shadow-lg p-6">
-                    <h3 class="text-xl font-bold text-gray-800 mb-4">
+                <div id="detailsCard" class="hidden bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6">
+                    <h3 class="text-xl font-bold text-slate-900 mb-4">
                         <i class="fas fa-list mr-2"></i>상세 내역
                     </h3>
                     <div id="detailsContent"></div>
@@ -243,6 +260,25 @@
         // 파일을 선택하면 바로 자동 분석
         fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleAnalyze(); });
 
+        // 드래그 & 드롭 업로드
+        const dropZone = document.getElementById('dropZone');
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', e => {
+            e.preventDefault();
+            dropZone.classList.add('border-blue-400', 'bg-blue-50/40');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-blue-400', 'bg-blue-50/40');
+        });
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-400', 'bg-blue-50/40');
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                handleAnalyze();
+            }
+        });
+
         // 파일명에서 정산 월 자동 인식 (예: "26년 05월", "2026-05")
         function detectMonthFromFilename(name) {
             let m = name.match(/(?:20)?(\d{2})\s*년[\s_.-]*(\d{1,2})\s*월/);
@@ -284,6 +320,9 @@
 
                 const detected = detectMonthFromFilename(file.name);
                 if (detected) document.getElementById('settleMonth').value = detected;
+
+                document.getElementById('dropZoneText').innerHTML =
+                    '<i class="fas fa-check-circle text-emerald-500 mr-1.5"></i>' + escapeHtml(file.name);
 
                 rateSection.classList.remove('hidden');
                 rateSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -841,7 +880,7 @@
             let html = `
                 <div class="mb-4 flex items-start justify-between gap-4">
                     <div>
-                        <h4 class="text-lg font-bold text-gray-800">${escapeHtml(acc.accountName)}</h4>
+                        <h4 class="text-lg font-bold text-slate-900">${escapeHtml(acc.accountName)}</h4>
                         <p class="text-sm text-gray-600">총 광고비 (공급가): ${Math.floor(acc.totalAmount).toLocaleString('ko-KR')}원</p>
                         <p class="text-sm text-teal-600 font-medium">총 정산액 (공급가 기준): ${Math.floor(acc.totalSettlement).toLocaleString('ko-KR')}원</p>
                         <p class="text-sm font-bold text-green-600">총 지급액 (부가세 포함): ${Math.floor(acc.totalPayout).toLocaleString('ko-KR')}원</p>
