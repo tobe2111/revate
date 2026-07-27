@@ -88,8 +88,29 @@
                                class="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
                     </div>
                     <span id="exceptionCount" class="text-sm text-gray-400 whitespace-nowrap">예외 0건</span>
+                    <button id="mergeBtn"
+                            class="text-xs text-gray-400 hover:text-blue-600 underline whitespace-nowrap">회사 합치기</button>
                     <button id="clearMemoryBtn"
                             class="text-xs text-gray-400 hover:text-red-500 underline whitespace-nowrap">기억된 예외 지우기</button>
+                </div>
+
+                <div id="mergePanel" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-4 mb-3">
+                    <p class="text-xs text-slate-500 mb-3">
+                        <i class="fas fa-link mr-1"></i>
+                        같은 회사가 다른 이름으로 표기된 경우 하나로 합칩니다. 합치면 정산액도 합산되고, 다음 달부터 자동 적용됩니다.
+                    </p>
+                    <div class="flex flex-wrap items-center gap-2 mb-3">
+                        <select id="mergeFrom"
+                                class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"></select>
+                        <span class="text-slate-400 text-sm font-bold">→</span>
+                        <select id="mergeInto"
+                                class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"></select>
+                        <button id="mergeApply"
+                                class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg px-4 py-2 transition">
+                            합치기
+                        </button>
+                    </div>
+                    <div id="mergeList" class="flex flex-wrap gap-2"></div>
                 </div>
 
                 <div class="overflow-x-auto mb-6 max-h-96 overflow-y-auto border border-gray-100 rounded-lg">
@@ -342,7 +363,7 @@
             if (!row || row.length < 10) return null;
             // 시트 범위가 B열부터 시작 → 인덱스 0 = B열
             const media       = row[0];  // B열: 매체사
-            const accountName = row[5];  // G열: 계정명(고객사)
+            const accountName = resolveAccount(row[5]);  // G열: 계정명(고객사) - 합쳐진 회사는 대표 이름으로
             const supply      = parseFloat(row[6]);  // H열: 공급가(부가세 제외 광고비)
             const feeRate     = parseFloat(row[9]);  // K열: 수수료율
             if (!media || !accountName || accountName === '-' ||
@@ -358,21 +379,26 @@
 
         // ===== 파일 검증: 시트의 "합계" 행과 프로그램이 읽은 합계를 대조 =====
         function verifyTotals(rows) {
-            let parsedSum = 0;
-            let sheetTotal = null;
+            let parsedSum = 0, sheetTotal = null, excludedSum = 0, excludedCount = 0;
             for (let i = 3; i < rows.length; i++) {
                 const r = readRow(rows[i]);
                 if (r) { parsedSum += r.supply; continue; }
                 const row = rows[i];
-                if (row && typeof row[0] === 'string' && row[0].includes('합')) {
-                    const t = parseFloat(row[6]);
-                    if (!isNaN(t) && sheetTotal === null) sheetTotal = t;
+                if (!row) continue;
+                const isTotal = typeof row[0] === 'string' && row[0].includes('합');
+                const h = parseFloat(row[6]);
+                if (isTotal) {
+                    if (!isNaN(h) && sheetTotal === null) sheetTotal = h;
+                } else if (!isNaN(h) && h !== 0) {
+                    // 계정명이 '-' 등으로 비어 있어 정산 대상에서 제외된, 금액 있는 행
+                    excludedSum += h;
+                    excludedCount++;
                 }
             }
-            return { parsedSum, sheetTotal };
+            return { parsedSum, sheetTotal, excludedSum, excludedCount };
         }
 
-        function renderVerifyBanner({ parsedSum, sheetTotal }) {
+        function renderVerifyBanner({ parsedSum, sheetTotal, excludedSum, excludedCount }) {
             const el = document.getElementById('verifyBanner');
             el.classList.remove('hidden');
             const fmt = n => Math.floor(n).toLocaleString('ko-KR') + '원';
@@ -382,6 +408,10 @@
             } else if (Math.abs(parsedSum - sheetTotal) < 1) {
                 el.className = 'text-sm rounded-lg px-4 py-3 mb-3 bg-green-50 text-green-700 border border-green-200';
                 el.innerHTML = '<i class="fas fa-check-circle mr-2"></i>검증 완료: 파일 합계와 일치합니다 (공급가 ' + fmt(sheetTotal) + ')';
+            } else if (Math.abs(parsedSum + excludedSum - sheetTotal) < 1) {
+                el.className = 'text-sm rounded-lg px-4 py-3 mb-3 bg-blue-50 text-blue-700 border border-blue-200';
+                el.innerHTML = '<i class="fas fa-info-circle mr-2"></i>검증 완료: 다만 계정명이 없는(\'-\') ' + excludedCount + '개 행(공급가 ' + fmt(excludedSum) +
+                    ')은 고객사를 알 수 없어 정산에서 제외했습니다. 나머지는 파일 합계와 일치합니다.';
             } else {
                 el.className = 'text-sm rounded-lg px-4 py-3 mb-3 bg-red-50 text-red-700 border border-red-300 font-medium';
                 el.innerHTML = '<i class="fas fa-exclamation-circle mr-2"></i>⚠ 합계가 다릅니다! 시트 합계 ' + fmt(sheetTotal) +
@@ -539,6 +569,89 @@
                 tr.classList.toggle('hidden', q !== '' && !tr.dataset.search.includes(q));
             });
         });
+
+        // ===== 회사 합치기 (별칭) =====
+        // { "빌록": "빌록(BILOC)" } → 빌록으로 표기된 행을 전부 빌록(BILOC)으로 취급
+        const ALIAS_KEY = 'companyAliases';
+
+        function resolveAccount(name) {
+            if (!name) return name;
+            const map = loadJSON(ALIAS_KEY);
+            let n = name, i = 0;
+            while (map[n] && map[n] !== n && i++ < 5) n = map[n];
+            return n;
+        }
+
+        document.getElementById('mergeBtn').addEventListener('click', () => {
+            const panel = document.getElementById('mergePanel');
+            panel.classList.toggle('hidden');
+            if (!panel.classList.contains('hidden')) refreshMergeUI();
+        });
+
+        function refreshMergeUI() {
+            const companies = [...new Set([...rowMeta.values()].map(m => m.accountName))].sort();
+            const fromSel = document.getElementById('mergeFrom');
+            const intoSel = document.getElementById('mergeInto');
+            fromSel.innerHTML = '';
+            intoSel.innerHTML = '';
+            companies.forEach(c => {
+                fromSel.appendChild(new Option(c, c));
+                intoSel.appendChild(new Option(c, c));
+            });
+
+            const list = document.getElementById('mergeList');
+            list.innerHTML = '';
+            const entries = Object.entries(loadJSON(ALIAS_KEY));
+            if (entries.length === 0) {
+                list.innerHTML = '<span class="text-xs text-slate-400">합쳐진 회사가 없습니다.</span>';
+                return;
+            }
+            entries.forEach(([from, to]) => {
+                const chip = document.createElement('span');
+                chip.className = 'inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-full px-3 py-1.5 text-xs text-slate-600';
+                chip.textContent = from + ' → ' + to;
+                const x = document.createElement('button');
+                x.innerHTML = '<i class="fas fa-times"></i>';
+                x.className = 'text-slate-300 hover:text-red-500 ml-1';
+                x.title = '합치기 해제';
+                x.addEventListener('click', () => {
+                    const m = loadJSON(ALIAS_KEY);
+                    delete m[from];
+                    localStorage.setItem(ALIAS_KEY, JSON.stringify(m));
+                    reprocessAfterMerge();
+                });
+                chip.appendChild(x);
+                list.appendChild(chip);
+            });
+        }
+
+        document.getElementById('mergeApply').addEventListener('click', () => {
+            const from = document.getElementById('mergeFrom').value;
+            const into = document.getElementById('mergeInto').value;
+            if (!from || !into || from === into) {
+                alert('서로 다른 두 회사를 선택해주세요.');
+                return;
+            }
+            const map = loadJSON(ALIAS_KEY);
+            map[from] = into;
+            // from을 가리키던 기존 별칭도 최종 대상으로 정리
+            for (const k of Object.keys(map)) {
+                if (map[k] === from) map[k] = into;
+                if (map[k] === k) delete map[k];
+            }
+            localStorage.setItem(ALIAS_KEY, JSON.stringify(map));
+            reprocessAfterMerge();
+        });
+
+        function reprocessAfterMerge() {
+            if (parsedRows) {
+                rowMeta = buildRowMeta(parsedRows);
+                renderRateTable(rowMeta);
+                renderVerifyBanner(verifyTotals(parsedRows));
+                results.classList.add('hidden');
+            }
+            refreshMergeUI();
+        }
 
         document.getElementById('clearMemoryBtn').addEventListener('click', () => {
             if (!confirm('기억된 예외 정산율을 모두 지울까요? (예: 빌록 12%)')) return;
@@ -924,7 +1037,7 @@
         }
 
         // ===== 백업 저장 / 불러오기 =====
-        const BACKUP_KEYS = ['settlementHistory', 'settleRateOverridesV2', 'recipientTitles', 'sentStatus'];
+        const BACKUP_KEYS = ['settlementHistory', 'settleRateOverridesV2', 'recipientTitles', 'sentStatus', 'companyAliases'];
 
         document.getElementById('backupBtn').addEventListener('click', () => {
             const backup = { app: '마케팅 정산 계산기', version: 1, exportedAt: new Date().toISOString(), data: {} };
@@ -961,7 +1074,7 @@
                         renderSentBadge(btn, getStatus(btn.dataset.account)));
                     updateSentCount();
                 }
-                alert('백업을 불러왔습니다. (이력 · 예외 정산율 · 호칭 · 진행 상태 복원 완료)');
+                alert('백업을 불러왔습니다. (이력 · 예외 정산율 · 호칭 · 진행 상태 · 회사 합치기 복원 완료)');
             } catch (e) {
                 alert('백업 파일을 불러오지 못했습니다: ' + e.message);
             }
