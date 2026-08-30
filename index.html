@@ -109,37 +109,34 @@
                 </div>
 
                 <div id="mergePanel" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-4 mb-3">
-                    <p class="text-sm font-medium text-slate-700 mb-1">
-                        <i class="fas fa-object-group mr-1.5 text-blue-500"></i>회사 묶기
-                    </p>
+                    <div class="flex items-center justify-between mb-1">
+                        <p class="text-sm font-medium text-slate-700">
+                            <i class="fas fa-object-group mr-1.5 text-blue-500"></i>회사 묶기
+                        </p>
+                        <span id="mergeSelCount" class="text-xs text-slate-400">선택 0개</span>
+                    </div>
                     <p class="text-xs text-slate-500 mb-3">
-                        한 업체가 여러 계정을 쓰는 경우 하나로 묶습니다. 여러 묶음을 만들 수 있고, 다음 달부터 자동 적용됩니다.
+                        한 업체가 쓰는 계정들을 체크해서 묶습니다. 묶음은 여러 개 만들 수 있고, 다음 달부터 자동 적용됩니다.
                     </p>
 
-                    <div id="mergeSuggest" class="mb-3"></div>
+                    <input type="text" id="mergeSearch" placeholder="회사 검색"
+                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <div id="mergeCandidates"
+                         class="max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-lg p-2 mb-2 space-y-0.5"></div>
 
-                    <details id="mergeManual" class="bg-white border border-slate-200 rounded-lg">
-                        <summary class="cursor-pointer select-none px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">
-                            <i class="fas fa-plus-circle mr-1.5 text-slate-400"></i>직접 묶기
-                        </summary>
-                        <div class="px-3 pb-3 pt-1">
-                            <input type="text" id="mergeSearch" placeholder="회사 검색"
-                                   class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                            <div id="mergeCandidates"
-                                 class="max-h-44 overflow-y-auto border border-slate-200 rounded-lg p-2 mb-2 space-y-0.5"></div>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span class="text-sm text-slate-500">대표 회사명</span>
-                                <select id="mergeInto"
-                                        class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"></select>
-                                <button id="mergeApply"
-                                        class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg px-4 py-2 transition">
-                                    묶기
-                                </button>
-                            </div>
-                        </div>
-                    </details>
+                    <div class="flex flex-wrap items-center gap-2 pb-3 mb-3 border-b border-slate-200">
+                        <span class="text-sm text-slate-500">대표 이름</span>
+                        <select id="mergeInto"
+                                class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 max-w-xs"></select>
+                        <button id="mergeApply"
+                                class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg px-4 py-2 transition">
+                            <i class="fas fa-plus mr-1"></i>새 묶음 만들기
+                        </button>
+                        <button id="mergeClearSel"
+                                class="text-xs text-slate-400 hover:text-slate-600 underline">선택 해제</button>
+                    </div>
 
-                    <div id="mergeList" class="mt-3 space-y-2"></div>
+                    <div id="mergeList" class="space-y-2"></div>
                 </div>
 
                 <div id="rateList"
@@ -356,7 +353,7 @@
                 renderRateTable(rowMeta);
                 renderVerifyBanner(verifyTotals(parsedRows));
                 renderUnnamedPanel(collectUnnamed(parsedRows));
-                updateMergeHint();
+                updateMergeBadge();
 
                 const detected = detectMonthFromFilename(file.name);
                 if (detected) document.getElementById('settleMonth').value = detected;
@@ -479,8 +476,19 @@
                 const left = document.createElement('div');
                 left.className = 'min-w-0';
                 const nameEl = document.createElement('p');
-                nameEl.className = 'font-semibold text-slate-800 truncate';
-                nameEl.textContent = company.name;
+                nameEl.className = 'font-semibold text-slate-800 truncate flex items-center gap-1.5';
+                const nameText = document.createElement('span');
+                nameText.className = 'truncate';
+                nameText.textContent = company.name;
+                nameEl.appendChild(nameText);
+                const grouped = mergeGroups()[company.name];
+                if (grouped) {
+                    const tag = document.createElement('span');
+                    tag.className = 'shrink-0 text-[11px] bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 font-medium';
+                    tag.textContent = '묶음 ' + (grouped.length + 1);
+                    tag.title = '묶인 회사: ' + [company.name, ...grouped].join(', ');
+                    nameEl.appendChild(tag);
+                }
                 const mediaCount = new Set([...company.groups.values()].flatMap(g => [...g.medias])).size;
                 const subEl = document.createElement('p');
                 subEl.className = 'text-xs text-slate-400 mt-0.5';
@@ -696,7 +704,7 @@
             renderRateTable(rowMeta);
             renderVerifyBanner(verifyTotals(parsedRows));
             renderUnnamedPanel(collectUnnamed(parsedRows));
-            updateMergeHint();
+            updateMergeBadge();
             results.classList.add('hidden');
         }
 
@@ -718,163 +726,171 @@
             if (!panel.classList.contains('hidden')) refreshMergeUI();
         });
 
-        // 회사명 정규화 → 같은 회사로 보이는 이름 자동 감지
-        function normCompany(name) {
-            return String(name)
-                .replace(/\(.*?\)/g, '')
-                .replace(/주식회사|㈜|\(주\)|\(유\)|유한회사|사업자|본사/g, '')
-                .replace(/[\s\-_.,·]/g, '')
-                .toLowerCase();
-        }
-
-        // 이름이 비슷한 회사들을 묶음 후보로 제안
-        function suggestMergeGroups(companies) {
-            const byNorm = new Map();
-            companies.forEach(c => {
-                const k = normCompany(c);
-                if (!k) return;
-                if (!byNorm.has(k)) byNorm.set(k, []);
-                byNorm.get(k).push(c);
+        // 현재 묶음 상태: { 대표이름: [소속 회사...] }
+        function mergeGroups() {
+            const groups = {};
+            Object.entries(loadJSON(ALIAS_KEY)).forEach(([from, to]) => {
+                (groups[to] = groups[to] || []).push(from);
             });
-            return [...byNorm.values()]
-                .filter(g => g.length > 1)
-                .sort((a, b) => b.length - a.length);
+            return groups;
         }
 
-        function renderMergeSuggestions(companies) {
-            const box = document.getElementById('mergeSuggest');
-            const groups = suggestMergeGroups(companies);
-            box.innerHTML = '';
-            if (groups.length === 0) return;
+        // 체크된 회사 목록
+        function checkedCompanies() {
+            return [...document.querySelectorAll('.merge-check:checked')].map(cb => cb.value);
+        }
 
-            const head = document.createElement('p');
-            head.className = 'text-xs text-blue-700 font-medium mb-2';
-            head.innerHTML = '<i class="fas fa-wand-magic-sparkles mr-1"></i>같은 회사로 보이는 이름이 ' +
-                             groups.length + '건 있습니다. 확인 후 묶어주세요.';
-            box.appendChild(head);
+        function updateMergeSelection() {
+            const picked = checkedCompanies();
+            document.getElementById('mergeSelCount').textContent = '선택 ' + picked.length + '개';
 
-            groups.forEach(g => {
-                // 가장 긴 이름을 대표로 (보통 정식 표기)
-                const target = [...g].sort((a, b) => b.length - a.length)[0];
-                const card = document.createElement('div');
-                card.className = 'flex flex-wrap items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-2';
+            // 대표 이름은 선택한 회사 중에서 고르게
+            const sel = document.getElementById('mergeInto');
+            const prev = sel.value;
+            sel.innerHTML = '';
+            picked.forEach(c => sel.appendChild(new Option(c, c)));
+            if (picked.includes(prev)) sel.value = prev;
+            sel.disabled = picked.length === 0;
 
-                const names = document.createElement('span');
-                names.className = 'text-sm text-slate-700 flex-1 min-w-0';
-                names.textContent = g.join('  +  ');
+            const apply = document.getElementById('mergeApply');
+            apply.disabled = picked.length < 2;
+            apply.className = picked.length < 2
+                ? 'bg-slate-200 text-slate-400 text-sm font-bold rounded-lg px-4 py-2 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg px-4 py-2 transition';
 
-                const sel = document.createElement('select');
-                sel.className = 'border border-blue-200 rounded-lg px-2 py-1 text-xs bg-white';
-                sel.title = '대표 회사명';
-                g.forEach(n => sel.appendChild(new Option(n, n)));
-                sel.value = target;
-
-                const btn = document.createElement('button');
-                btn.className = 'bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg px-3 py-1.5 transition whitespace-nowrap';
-                btn.textContent = '묶기';
-                btn.addEventListener('click', () => applyMerge(g.filter(n => n !== sel.value), sel.value));
-
-                card.appendChild(names);
-                card.appendChild(sel);
-                card.appendChild(btn);
-                box.appendChild(card);
+            // 그룹 카드의 "선택 추가" 버튼 활성화
+            document.querySelectorAll('.group-add').forEach(b => {
+                b.disabled = picked.length === 0;
+                b.classList.toggle('opacity-40', picked.length === 0);
             });
         }
 
-        // 실제 묶기 처리 (추천 / 직접 묶기 공용)
         function applyMerge(members, target) {
+            members = members.filter(m => m !== target);
             if (!target || members.length === 0) return;
             const map = loadJSON(ALIAS_KEY);
             members.forEach(from => { map[from] = target; });
             for (const k of Object.keys(map)) {
-                if (members.includes(map[k])) map[k] = target;
+                if (members.includes(map[k])) map[k] = target;   // 체인 정리
                 if (map[k] === k) delete map[k];
             }
             localStorage.setItem(ALIAS_KEY, JSON.stringify(map));
             reprocessAfterMerge();
         }
 
-        function updateMergeHint() {
+        // 현재 묶음 개수를 버튼에 표시
+        function updateMergeBadge() {
+            const n = Object.keys(mergeGroups()).length;
             const btn = document.getElementById('mergeBtn');
-            const n = suggestMergeGroups([...rowMeta.keys()]).length;
-            if (n > 0) {
-                btn.innerHTML = '회사 합치기 <span class="ml-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">' + n + '</span>';
-                btn.className = 'text-xs text-amber-600 hover:text-amber-700 underline whitespace-nowrap';
-            } else {
-                btn.textContent = '회사 합치기';
-                btn.className = 'text-xs text-gray-400 hover:text-blue-600 underline whitespace-nowrap';
-            }
+            btn.innerHTML = n > 0
+                ? '회사 묶기 <span class="ml-0.5 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">' + n + '</span>'
+                : '회사 묶기';
+            btn.className = n > 0
+                ? 'text-xs text-blue-600 hover:text-blue-700 underline whitespace-nowrap'
+                : 'text-xs text-gray-400 hover:text-blue-600 underline whitespace-nowrap';
         }
 
         function refreshMergeUI() {
             const companies = [...rowMeta.keys()].sort();
+            const groups = mergeGroups();
+            const memberOf = {};
+            Object.entries(groups).forEach(([to, froms]) => froms.forEach(f => { memberOf[f] = to; }));
 
-            renderMergeSuggestions(companies);
-
-            // 직접 묶기: 체크박스 + 대표 선택
-            const intoSel = document.getElementById('mergeInto');
-            const prev = intoSel.value;
-            intoSel.innerHTML = '';
-            companies.forEach(c => intoSel.appendChild(new Option(c, c)));
-            if (companies.includes(prev)) intoSel.value = prev;
-
+            // --- 회사 체크 목록 ---
             const box = document.getElementById('mergeCandidates');
             box.innerHTML = '';
             companies.forEach(c => {
                 const label = document.createElement('label');
-                label.className = 'merge-item flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-slate-50 cursor-pointer text-sm';
+                label.className = 'merge-item flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-sm';
                 label.dataset.search = c.toLowerCase();
+
                 const cb = document.createElement('input');
                 cb.type = 'checkbox';
                 cb.value = c;
-                cb.className = 'merge-check w-4 h-4 accent-blue-600';
+                cb.className = 'merge-check w-4 h-4 accent-blue-600 shrink-0';
+                cb.addEventListener('change', updateMergeSelection);
+
                 const span = document.createElement('span');
                 span.className = 'text-slate-700 truncate';
                 span.textContent = c;
+
                 label.appendChild(cb);
                 label.appendChild(span);
+
+                // 이미 묶음의 대표인 경우 표시
+                if (groups[c]) {
+                    const tag = document.createElement('span');
+                    tag.className = 'ml-auto shrink-0 text-[11px] bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 font-medium';
+                    tag.textContent = '묶음 · 계정 ' + (groups[c].length + 1) + '개';
+                    label.appendChild(tag);
+                }
                 box.appendChild(label);
             });
 
-            // 현재 묶여 있는 그룹 목록
+            // --- 묶인 그룹 목록 ---
             const list = document.getElementById('mergeList');
             list.innerHTML = '';
-            const entries = Object.entries(loadJSON(ALIAS_KEY));
-            if (entries.length === 0) {
-                list.innerHTML = '<p class="text-xs text-slate-400">묶인 회사가 없습니다.</p>';
-                return;
-            }
-            const byTarget = {};
-            entries.forEach(([from, to]) => { (byTarget[to] = byTarget[to] || []).push(from); });
-
             const head = document.createElement('p');
-            head.className = 'text-xs text-slate-500 font-medium';
-            head.textContent = '묶인 그룹 ' + Object.keys(byTarget).length + '개';
+            head.className = 'text-sm font-medium text-slate-700 mb-1';
+            head.innerHTML = '<i class="fas fa-layer-group mr-1.5 text-slate-400"></i>묶인 그룹 ' +
+                             Object.keys(groups).length + '개';
             list.appendChild(head);
 
-            Object.entries(byTarget).forEach(([to, froms]) => {
+            if (Object.keys(groups).length === 0) {
+                const empty = document.createElement('p');
+                empty.className = 'text-xs text-slate-400';
+                empty.textContent = '아직 묶은 회사가 없습니다. 위에서 회사를 2개 이상 체크한 뒤 [새 묶음 만들기]를 누르세요.';
+                list.appendChild(empty);
+            }
+
+            Object.entries(groups).forEach(([to, froms]) => {
                 const card = document.createElement('div');
-                card.className = 'bg-white border border-slate-200 rounded-lg px-3 py-2';
+                card.className = 'bg-white border border-slate-200 rounded-lg px-3 py-2.5';
 
                 const title = document.createElement('div');
-                title.className = 'flex items-center justify-between gap-2 mb-1.5';
+                title.className = 'flex items-center justify-between gap-2 mb-2';
+
                 const name = document.createElement('span');
                 name.className = 'text-sm font-semibold text-slate-800 truncate';
-                name.innerHTML = '<i class="fas fa-building mr-1.5 text-slate-400"></i>' + escapeHtml(to);
+                name.innerHTML = '<i class="fas fa-building mr-1.5 text-blue-500"></i>' + escapeHtml(to) +
+                    '<span class="ml-2 text-xs font-normal text-slate-400">계정 ' + (froms.length + 1) + '개</span>';
+
+                const btns = document.createElement('div');
+                btns.className = 'flex items-center gap-2 shrink-0';
+
+                const add = document.createElement('button');
+                add.className = 'group-add text-xs text-blue-600 hover:text-blue-700 border border-blue-200 bg-blue-50 rounded-lg px-2.5 py-1 whitespace-nowrap';
+                add.innerHTML = '<i class="fas fa-plus mr-1"></i>선택 추가';
+                add.title = '위에서 체크한 회사를 이 그룹에 추가';
+                add.addEventListener('click', () => {
+                    const picked = checkedCompanies();
+                    if (picked.length === 0) { alert('추가할 회사를 위에서 체크해주세요.'); return; }
+                    applyMerge(picked, to);
+                });
+
                 const del = document.createElement('button');
                 del.className = 'text-xs text-slate-400 hover:text-red-500 whitespace-nowrap';
-                del.innerHTML = '<i class="fas fa-times mr-1"></i>그룹 해제';
+                del.innerHTML = '<i class="fas fa-times mr-1"></i>해제';
                 del.addEventListener('click', () => {
                     const m = loadJSON(ALIAS_KEY);
                     froms.forEach(f => delete m[f]);
                     localStorage.setItem(ALIAS_KEY, JSON.stringify(m));
                     reprocessAfterMerge();
                 });
+
+                btns.appendChild(add);
+                btns.appendChild(del);
                 title.appendChild(name);
-                title.appendChild(del);
+                title.appendChild(btns);
 
                 const chips = document.createElement('div');
                 chips.className = 'flex flex-wrap gap-1.5';
+                // 대표 이름도 칩으로 함께 보여주기 (어떤 회사들이 묶였는지 한눈에)
+                const main = document.createElement('span');
+                main.className = 'inline-flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-1 text-xs text-blue-700 font-medium';
+                main.textContent = to + ' (대표)';
+                chips.appendChild(main);
+
                 froms.forEach(f => {
                     const chip = document.createElement('span');
                     chip.className = 'inline-flex items-center gap-1 bg-slate-100 rounded-full px-2.5 py-1 text-xs text-slate-600';
@@ -882,7 +898,7 @@
                     const x = document.createElement('button');
                     x.innerHTML = '<i class="fas fa-times"></i>';
                     x.className = 'text-slate-400 hover:text-red-500';
-                    x.title = '이 회사만 빼기';
+                    x.title = '이 회사만 묶음에서 빼기';
                     x.addEventListener('click', () => {
                         const m = loadJSON(ALIAS_KEY);
                         delete m[f];
@@ -897,6 +913,8 @@
                 card.appendChild(chips);
                 list.appendChild(card);
             });
+
+            updateMergeSelection();
         }
 
         document.getElementById('mergeSearch').addEventListener('input', function () {
@@ -906,14 +924,15 @@
             });
         });
 
+        document.getElementById('mergeClearSel').addEventListener('click', () => {
+            document.querySelectorAll('.merge-check:checked').forEach(cb => { cb.checked = false; });
+            updateMergeSelection();
+        });
+
         document.getElementById('mergeApply').addEventListener('click', () => {
+            const picked = checkedCompanies();
             const into = document.getElementById('mergeInto').value;
-            const picked = [...document.querySelectorAll('.merge-check:checked')]
-                .map(cb => cb.value).filter(c => c !== into);
-            if (!into || picked.length === 0) {
-                alert('묶을 회사를 체크하고 대표 회사명을 선택해주세요.');
-                return;
-            }
+            if (picked.length < 2) { alert('묶을 회사를 2개 이상 체크해주세요.'); return; }
             applyMerge(picked, into);
         });
 
@@ -1046,6 +1065,15 @@
             };
         }
 
+        // 묶인 회사면 표에 작은 배지 표시
+        function mergedBadge(accountName) {
+            const g = mergeGroups()[accountName];
+            if (!g) return '';
+            const all = [accountName, ...g].join(', ');
+            return '<span class="shrink-0 text-[10px] bg-blue-100 text-blue-700 rounded-full px-1.5 py-0.5 font-medium" title="' +
+                   escapeHtml(all) + '">묶음 ' + (g.length + 1) + '</span>';
+        }
+
         function formatDelta(diff) {
             if (diff > 0) return `<span class="text-red-500 text-xs font-medium">▲${Math.floor(diff).toLocaleString('ko-KR')}</span>`;
             if (diff < 0) return `<span class="text-blue-500 text-xs font-medium">▼${Math.floor(-diff).toLocaleString('ko-KR')}</span>`;
@@ -1092,6 +1120,7 @@
                         <div class="flex items-center gap-2 min-w-0">
                             <span class="${rankClass} text-xs w-5 shrink-0 text-right">${i + 1}</span>
                             <span class="font-medium text-gray-900 truncate" title="${escapeHtml(acc.accountName)}">${escapeHtml(acc.accountName)}</span>
+                            ${mergedBadge(acc.accountName)}
                         </div>
                     </td>
                     <td class="px-3 py-3 whitespace-nowrap text-right text-sm text-gray-600">${Math.floor(acc.totalAmount).toLocaleString('ko-KR')}</td>
