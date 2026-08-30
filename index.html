@@ -109,24 +109,37 @@
                 </div>
 
                 <div id="mergePanel" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-4 mb-3">
-                    <p class="text-xs text-slate-500 mb-3">
-                        <i class="fas fa-link mr-1"></i>
-                        한 업체가 여러 계정을 쓰는 경우 체크해서 하나로 묶으세요. 정산액이 합산되고 다음 달부터 자동 적용됩니다.
+                    <p class="text-sm font-medium text-slate-700 mb-1">
+                        <i class="fas fa-object-group mr-1.5 text-blue-500"></i>회사 묶기
                     </p>
-                    <input type="text" id="mergeSearch" placeholder="회사 검색"
-                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                    <div id="mergeCandidates"
-                         class="max-h-52 overflow-y-auto bg-white border border-slate-200 rounded-lg p-2 mb-3 space-y-1"></div>
-                    <div class="flex flex-wrap items-center gap-2 mb-3">
-                        <span class="text-sm text-slate-500">대표 회사명</span>
-                        <select id="mergeInto"
-                                class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"></select>
-                        <button id="mergeApply"
-                                class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg px-4 py-2 transition">
-                            <i class="fas fa-object-group mr-1"></i>선택한 회사 묶기
-                        </button>
-                    </div>
-                    <div id="mergeList" class="flex flex-wrap gap-2"></div>
+                    <p class="text-xs text-slate-500 mb-3">
+                        한 업체가 여러 계정을 쓰는 경우 하나로 묶습니다. 여러 묶음을 만들 수 있고, 다음 달부터 자동 적용됩니다.
+                    </p>
+
+                    <div id="mergeSuggest" class="mb-3"></div>
+
+                    <details id="mergeManual" class="bg-white border border-slate-200 rounded-lg">
+                        <summary class="cursor-pointer select-none px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">
+                            <i class="fas fa-plus-circle mr-1.5 text-slate-400"></i>직접 묶기
+                        </summary>
+                        <div class="px-3 pb-3 pt-1">
+                            <input type="text" id="mergeSearch" placeholder="회사 검색"
+                                   class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                            <div id="mergeCandidates"
+                                 class="max-h-44 overflow-y-auto border border-slate-200 rounded-lg p-2 mb-2 space-y-0.5"></div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-sm text-slate-500">대표 회사명</span>
+                                <select id="mergeInto"
+                                        class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"></select>
+                                <button id="mergeApply"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg px-4 py-2 transition">
+                                    묶기
+                                </button>
+                            </div>
+                        </div>
+                    </details>
+
+                    <div id="mergeList" class="mt-3 space-y-2"></div>
                 </div>
 
                 <div id="rateList"
@@ -196,14 +209,13 @@
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">순위</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">고객사 계정명</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">광고비 (공급가)</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">정산액 (공급가)</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">지급액 (부가세 포함)</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">전월대비</th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">안내문</th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">진행 상태</th>
+                                    <th class="px-3 py-3 text-left text-xs font-medium text-slate-400 tracking-wider">고객사</th>
+                                    <th class="px-3 py-3 text-right text-xs font-medium text-slate-400 tracking-wider whitespace-nowrap">광고비</th>
+                                    <th class="px-3 py-3 text-right text-xs font-medium text-slate-400 tracking-wider whitespace-nowrap">정산액</th>
+                                    <th class="px-3 py-3 text-right text-xs font-medium text-slate-400 tracking-wider whitespace-nowrap">지급액<span class="text-[10px] font-normal">(VAT 포함)</span></th>
+                                    <th class="px-3 py-3 text-right text-xs font-medium text-slate-400 tracking-wider whitespace-nowrap">전월대비</th>
+                                    <th class="px-3 py-3 text-center text-xs font-medium text-slate-400 tracking-wider">안내문</th>
+                                    <th class="px-3 py-3 text-center text-xs font-medium text-slate-400 tracking-wider whitespace-nowrap">진행 상태</th>
                                 </tr>
                             </thead>
                             <tbody id="summaryTableBody" class="bg-white divide-y divide-gray-200"></tbody>
@@ -344,6 +356,7 @@
                 renderRateTable(rowMeta);
                 renderVerifyBanner(verifyTotals(parsedRows));
                 renderUnnamedPanel(collectUnnamed(parsedRows));
+                updateMergeHint();
 
                 const detected = detectMonthFromFilename(file.name);
                 if (detected) document.getElementById('settleMonth').value = detected;
@@ -683,6 +696,7 @@
             renderRateTable(rowMeta);
             renderVerifyBanner(verifyTotals(parsedRows));
             renderUnnamedPanel(collectUnnamed(parsedRows));
+            updateMergeHint();
             results.classList.add('hidden');
         }
 
@@ -704,8 +718,100 @@
             if (!panel.classList.contains('hidden')) refreshMergeUI();
         });
 
+        // 회사명 정규화 → 같은 회사로 보이는 이름 자동 감지
+        function normCompany(name) {
+            return String(name)
+                .replace(/\(.*?\)/g, '')
+                .replace(/주식회사|㈜|\(주\)|\(유\)|유한회사|사업자|본사/g, '')
+                .replace(/[\s\-_.,·]/g, '')
+                .toLowerCase();
+        }
+
+        // 이름이 비슷한 회사들을 묶음 후보로 제안
+        function suggestMergeGroups(companies) {
+            const byNorm = new Map();
+            companies.forEach(c => {
+                const k = normCompany(c);
+                if (!k) return;
+                if (!byNorm.has(k)) byNorm.set(k, []);
+                byNorm.get(k).push(c);
+            });
+            return [...byNorm.values()]
+                .filter(g => g.length > 1)
+                .sort((a, b) => b.length - a.length);
+        }
+
+        function renderMergeSuggestions(companies) {
+            const box = document.getElementById('mergeSuggest');
+            const groups = suggestMergeGroups(companies);
+            box.innerHTML = '';
+            if (groups.length === 0) return;
+
+            const head = document.createElement('p');
+            head.className = 'text-xs text-blue-700 font-medium mb-2';
+            head.innerHTML = '<i class="fas fa-wand-magic-sparkles mr-1"></i>같은 회사로 보이는 이름이 ' +
+                             groups.length + '건 있습니다. 확인 후 묶어주세요.';
+            box.appendChild(head);
+
+            groups.forEach(g => {
+                // 가장 긴 이름을 대표로 (보통 정식 표기)
+                const target = [...g].sort((a, b) => b.length - a.length)[0];
+                const card = document.createElement('div');
+                card.className = 'flex flex-wrap items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-2';
+
+                const names = document.createElement('span');
+                names.className = 'text-sm text-slate-700 flex-1 min-w-0';
+                names.textContent = g.join('  +  ');
+
+                const sel = document.createElement('select');
+                sel.className = 'border border-blue-200 rounded-lg px-2 py-1 text-xs bg-white';
+                sel.title = '대표 회사명';
+                g.forEach(n => sel.appendChild(new Option(n, n)));
+                sel.value = target;
+
+                const btn = document.createElement('button');
+                btn.className = 'bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg px-3 py-1.5 transition whitespace-nowrap';
+                btn.textContent = '묶기';
+                btn.addEventListener('click', () => applyMerge(g.filter(n => n !== sel.value), sel.value));
+
+                card.appendChild(names);
+                card.appendChild(sel);
+                card.appendChild(btn);
+                box.appendChild(card);
+            });
+        }
+
+        // 실제 묶기 처리 (추천 / 직접 묶기 공용)
+        function applyMerge(members, target) {
+            if (!target || members.length === 0) return;
+            const map = loadJSON(ALIAS_KEY);
+            members.forEach(from => { map[from] = target; });
+            for (const k of Object.keys(map)) {
+                if (members.includes(map[k])) map[k] = target;
+                if (map[k] === k) delete map[k];
+            }
+            localStorage.setItem(ALIAS_KEY, JSON.stringify(map));
+            reprocessAfterMerge();
+        }
+
+        function updateMergeHint() {
+            const btn = document.getElementById('mergeBtn');
+            const n = suggestMergeGroups([...rowMeta.keys()]).length;
+            if (n > 0) {
+                btn.innerHTML = '회사 합치기 <span class="ml-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">' + n + '</span>';
+                btn.className = 'text-xs text-amber-600 hover:text-amber-700 underline whitespace-nowrap';
+            } else {
+                btn.textContent = '회사 합치기';
+                btn.className = 'text-xs text-gray-400 hover:text-blue-600 underline whitespace-nowrap';
+            }
+        }
+
         function refreshMergeUI() {
             const companies = [...rowMeta.keys()].sort();
+
+            renderMergeSuggestions(companies);
+
+            // 직접 묶기: 체크박스 + 대표 선택
             const intoSel = document.getElementById('mergeInto');
             const prev = intoSel.value;
             intoSel.innerHTML = '';
@@ -716,7 +822,7 @@
             box.innerHTML = '';
             companies.forEach(c => {
                 const label = document.createElement('label');
-                label.className = 'merge-item flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-sm';
+                label.className = 'merge-item flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-slate-50 cursor-pointer text-sm';
                 label.dataset.search = c.toLowerCase();
                 const cb = document.createElement('input');
                 cb.type = 'checkbox';
@@ -730,31 +836,66 @@
                 box.appendChild(label);
             });
 
+            // 현재 묶여 있는 그룹 목록
             const list = document.getElementById('mergeList');
             list.innerHTML = '';
             const entries = Object.entries(loadJSON(ALIAS_KEY));
             if (entries.length === 0) {
-                list.innerHTML = '<span class="text-xs text-slate-400">묶인 회사가 없습니다.</span>';
+                list.innerHTML = '<p class="text-xs text-slate-400">묶인 회사가 없습니다.</p>';
                 return;
             }
             const byTarget = {};
             entries.forEach(([from, to]) => { (byTarget[to] = byTarget[to] || []).push(from); });
+
+            const head = document.createElement('p');
+            head.className = 'text-xs text-slate-500 font-medium';
+            head.textContent = '묶인 그룹 ' + Object.keys(byTarget).length + '개';
+            list.appendChild(head);
+
             Object.entries(byTarget).forEach(([to, froms]) => {
-                const chip = document.createElement('span');
-                chip.className = 'inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-full px-3 py-1.5 text-xs text-slate-600';
-                chip.textContent = froms.join(', ') + ' → ' + to;
-                const x = document.createElement('button');
-                x.innerHTML = '<i class="fas fa-times"></i>';
-                x.className = 'text-slate-300 hover:text-red-500 ml-1';
-                x.title = '묶기 해제';
-                x.addEventListener('click', () => {
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-slate-200 rounded-lg px-3 py-2';
+
+                const title = document.createElement('div');
+                title.className = 'flex items-center justify-between gap-2 mb-1.5';
+                const name = document.createElement('span');
+                name.className = 'text-sm font-semibold text-slate-800 truncate';
+                name.innerHTML = '<i class="fas fa-building mr-1.5 text-slate-400"></i>' + escapeHtml(to);
+                const del = document.createElement('button');
+                del.className = 'text-xs text-slate-400 hover:text-red-500 whitespace-nowrap';
+                del.innerHTML = '<i class="fas fa-times mr-1"></i>그룹 해제';
+                del.addEventListener('click', () => {
                     const m = loadJSON(ALIAS_KEY);
                     froms.forEach(f => delete m[f]);
                     localStorage.setItem(ALIAS_KEY, JSON.stringify(m));
                     reprocessAfterMerge();
                 });
-                chip.appendChild(x);
-                list.appendChild(chip);
+                title.appendChild(name);
+                title.appendChild(del);
+
+                const chips = document.createElement('div');
+                chips.className = 'flex flex-wrap gap-1.5';
+                froms.forEach(f => {
+                    const chip = document.createElement('span');
+                    chip.className = 'inline-flex items-center gap-1 bg-slate-100 rounded-full px-2.5 py-1 text-xs text-slate-600';
+                    chip.textContent = f;
+                    const x = document.createElement('button');
+                    x.innerHTML = '<i class="fas fa-times"></i>';
+                    x.className = 'text-slate-400 hover:text-red-500';
+                    x.title = '이 회사만 빼기';
+                    x.addEventListener('click', () => {
+                        const m = loadJSON(ALIAS_KEY);
+                        delete m[f];
+                        localStorage.setItem(ALIAS_KEY, JSON.stringify(m));
+                        reprocessAfterMerge();
+                    });
+                    chip.appendChild(x);
+                    chips.appendChild(chip);
+                });
+
+                card.appendChild(title);
+                card.appendChild(chips);
+                list.appendChild(card);
             });
         }
 
@@ -773,14 +914,7 @@
                 alert('묶을 회사를 체크하고 대표 회사명을 선택해주세요.');
                 return;
             }
-            const map = loadJSON(ALIAS_KEY);
-            picked.forEach(from => { map[from] = into; });
-            for (const k of Object.keys(map)) {
-                if (picked.includes(map[k])) map[k] = into;
-                if (map[k] === k) delete map[k];
-            }
-            localStorage.setItem(ALIAS_KEY, JSON.stringify(map));
-            reprocessAfterMerge();
+            applyMerge(picked, into);
         });
 
         function reprocessAfterMerge() {
@@ -913,9 +1047,9 @@
         }
 
         function formatDelta(diff) {
-            if (diff > 0) return `<span class="text-red-500 text-sm font-medium">▲ ${Math.floor(diff).toLocaleString('ko-KR')}원</span>`;
-            if (diff < 0) return `<span class="text-blue-500 text-sm font-medium">▼ ${Math.floor(-diff).toLocaleString('ko-KR')}원</span>`;
-            return `<span class="text-gray-400 text-sm">—</span>`;
+            if (diff > 0) return `<span class="text-red-500 text-xs font-medium">▲${Math.floor(diff).toLocaleString('ko-KR')}</span>`;
+            if (diff < 0) return `<span class="text-blue-500 text-xs font-medium">▼${Math.floor(-diff).toLocaleString('ko-KR')}</span>`;
+            return `<span class="text-gray-300 text-xs">—</span>`;
         }
 
         function displayResults(data, prev) {
@@ -954,32 +1088,27 @@
                 }
 
                 row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap"><span class="${rankClass}">${i + 1}</span></td>
-                    <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${escapeHtml(acc.accountName)}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-gray-900">${Math.floor(acc.totalAmount).toLocaleString('ko-KR')}원</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-teal-600 font-medium">${Math.floor(acc.totalSettlement).toLocaleString('ko-KR')}원</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right font-bold text-green-600">${Math.floor(acc.totalPayout).toLocaleString('ko-KR')}원</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right">${deltaHtml}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-center">
-                        <div class="flex items-center justify-center gap-1.5">
-                            <input type="text" class="title-input w-20 border border-gray-200 rounded px-2 py-1.5 text-xs text-center text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                                   list="titleOptions" title="안내문에 들어갈 호칭">
-                            <button class="copy-btn text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded px-2.5 py-1.5 transition font-medium">
-                                <i class="fas fa-copy mr-1"></i>복사
-                            </button>
+                    <td class="px-3 py-3">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="${rankClass} text-xs w-5 shrink-0 text-right">${i + 1}</span>
+                            <span class="font-medium text-gray-900 truncate" title="${escapeHtml(acc.accountName)}">${escapeHtml(acc.accountName)}</span>
                         </div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                    <td class="px-3 py-3 whitespace-nowrap text-right text-sm text-gray-600">${Math.floor(acc.totalAmount).toLocaleString('ko-KR')}</td>
+                    <td class="px-3 py-3 whitespace-nowrap text-right text-sm text-teal-600 font-medium">${Math.floor(acc.totalSettlement).toLocaleString('ko-KR')}</td>
+                    <td class="px-3 py-3 whitespace-nowrap text-right font-bold text-green-600">${Math.floor(acc.totalPayout).toLocaleString('ko-KR')}</td>
+                    <td class="px-3 py-3 whitespace-nowrap text-right">${deltaHtml}</td>
+                    <td class="px-3 py-3 whitespace-nowrap text-center">
+                        <button class="copy-btn text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-2.5 py-1.5 transition font-medium">
+                            <i class="fas fa-copy mr-1"></i>복사
+                        </button>
+                    </td>
+                    <td class="px-3 py-3 whitespace-nowrap text-center">
                         <button class="sent-btn" data-account="${escapeHtml(acc.accountName)}"></button>
                     </td>
                 `;
-                const titleInput = row.querySelector('.title-input');
-                titleInput.value = getTitle(acc.accountName);
-                titleInput.addEventListener('click', e => e.stopPropagation());
-                titleInput.addEventListener('input', () => setTitle(acc.accountName, titleInput.value));
                 row.querySelector('.copy-btn').addEventListener('click', e => {
                     e.stopPropagation();
-                    setTitle(acc.accountName, titleInput.value);
                     copyNotice(acc, e.currentTarget);
                 });
                 const sentBtn = row.querySelector('.sent-btn');
@@ -1129,10 +1258,15 @@
                         <p class="text-sm text-teal-600 font-medium">총 정산액 (공급가 기준): ${Math.floor(acc.totalSettlement).toLocaleString('ko-KR')}원</p>
                         <p class="text-sm font-bold text-green-600">총 지급액 (부가세 포함): ${Math.floor(acc.totalPayout).toLocaleString('ko-KR')}원</p>
                     </div>
-                    <button id="noticeBtn"
-                            class="shrink-0 text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-2 transition font-medium">
-                        <i class="fas fa-copy mr-1"></i>정산 안내문 복사
-                    </button>
+                    <div class="shrink-0 flex items-center gap-2">
+                        <label class="text-xs text-slate-400">호칭</label>
+                        <input type="text" id="noticeTitle" list="titleOptions" value="${escapeHtml(getTitle(acc.accountName))}"
+                               class="w-24 border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-300">
+                        <button id="noticeBtn"
+                                class="text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-2 transition font-medium whitespace-nowrap">
+                            <i class="fas fa-copy mr-1"></i>안내문 복사
+                        </button>
+                    </div>
                 </div>
                 <div class="space-y-2">
             `;
@@ -1163,8 +1297,12 @@
             detailsContent.innerHTML = html;
             detailsCard.classList.remove('hidden');
 
-            document.getElementById('noticeBtn')
-                .addEventListener('click', e => copyNotice(acc, e.currentTarget));
+            const titleInput = document.getElementById('noticeTitle');
+            titleInput.addEventListener('input', () => setTitle(acc.accountName, titleInput.value));
+            document.getElementById('noticeBtn').addEventListener('click', e => {
+                setTitle(acc.accountName, titleInput.value);
+                copyNotice(acc, e.currentTarget);
+            });
         }
 
         // ===== 저장된 정산 내역 (파일 없이 다시 보기) =====
