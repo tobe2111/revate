@@ -183,11 +183,33 @@
                             <button id="tplReset" class="text-xs text-slate-400 hover:text-red-500 underline">기본 문구로 되돌리기</button>
                         </div>
                         <p class="text-xs text-slate-500 mb-2">
-                            아래 치환어를 넣으면 회사별 값으로 자동 채워집니다. 수정하면 바로 저장됩니다.
+                            문장별로 고칠 수 있습니다. 비워두면 그 문장은 빠집니다. 수정하면 바로 저장됩니다.
                         </p>
-                        <div id="tplVars" class="flex flex-wrap gap-1.5 mb-2"></div>
-                        <textarea id="tplText" rows="8"
-                                  class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea>
+                        <div id="tplVars" class="flex flex-wrap gap-1.5 mb-3"></div>
+
+                        <div class="space-y-2.5">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">인사말</label>
+                                <input type="text" data-line="greeting"
+                                       class="tpl-line w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">정산 안내</label>
+                                <textarea data-line="main" rows="2"
+                                          class="tpl-line w-full border border-slate-300 rounded-lg px-3 py-2 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">금액 내역</label>
+                                <input type="text" data-line="detail"
+                                       class="tpl-line w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">마무리</label>
+                                <input type="text" data-line="closing"
+                                       class="tpl-line w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                            </div>
+                        </div>
+
                         <p class="text-xs text-slate-400 mt-3 mb-1">미리보기 <span id="tplPreviewName" class="text-slate-500"></span></p>
                         <pre id="tplPreview" class="whitespace-pre-wrap bg-white border border-slate-200 rounded-lg p-3 text-sm text-slate-700"></pre>
                     </div>
@@ -1291,18 +1313,23 @@
         }
 
         // ===== 정산 안내문 생성 (카톡 발송용) =====
-        const NOTICE_KEY = 'noticeTemplate';
-        const DEFAULT_NOTICE =
-            '안녕하세요 {호칭}, 좋은 아침입니다!\n\n' +
-            '{월} 정산 진행 도와드리겠습니다. 세금계산서로 진행 도와드리는 형태로 페이백 비용은 부가세 포함 {지급액}원 입니다.\n' +
-            '(공급가 {정산액}원 + 부가세 {부가세}원)\n\n' +
-            '세금계산서 처리 해주시면 월말 정산 도와드리겠습니다 :)';
-
+        const NOTICE_KEY = 'noticeLines';
+        const NOTICE_ORDER = ['greeting', 'main', 'detail', 'closing'];
+        const DEFAULT_NOTICE = {
+            greeting: '안녕하세요 {호칭}, 좋은 아침입니다!',
+            main: '{월} 정산 진행 도와드리겠습니다. 세금계산서로 진행 도와드리는 형태로 페이백 비용은 부가세 포함 {지급액}원 입니다.',
+            detail: '(공급가 {정산액}원 + 부가세 {부가세}원)',
+            closing: '세금계산서 처리 해주시면 월말 정산 도와드리겠습니다 :)'
+        };
         const NOTICE_VARS = ['{고객사}', '{호칭}', '{월}', '{광고비}', '{정산액}', '{부가세}', '{지급액}'];
 
-        function getNoticeTemplate() {
-            const t = localStorage.getItem(NOTICE_KEY);
-            return (t === null || t === '') ? DEFAULT_NOTICE : t;
+        function getNoticeLines() {
+            const saved = loadJSON(NOTICE_KEY);
+            const lines = {};
+            NOTICE_ORDER.forEach(k => {
+                lines[k] = (typeof saved[k] === 'string') ? saved[k] : DEFAULT_NOTICE[k];
+            });
+            return lines;
         }
 
         function buildNotice(acc) {
@@ -1322,12 +1349,21 @@
                 '{부가세}': won(vat),
                 '{지급액}': won(total)
             };
-            return getNoticeTemplate().replace(/\{[^}]+\}/g, m => (m in values ? values[m] : m));
+            const fill = s => s.replace(/\{[^}]+\}/g, m => (m in values ? values[m] : m));
+
+            const L = getNoticeLines();
+            // 인사말 / (정산 안내 + 금액 내역) / 마무리 를 빈 줄로 구분
+            const blocks = [
+                L.greeting.trim(),
+                [L.main.trim(), L.detail.trim()].filter(Boolean).join('\n'),
+                L.closing.trim()
+            ].filter(Boolean);
+            return fill(blocks.join('\n\n'));
         }
 
-        // ----- 안내문 문구 편집 -----
+        // ----- 안내문 문구 편집 (문장 단위) -----
         const tplPanel = document.getElementById('tplPanel');
-        const tplText = document.getElementById('tplText');
+        let tplLastFocused = null;
 
         function tplPreviewAccount() {
             return (lastResults && lastResults.accounts[0]) || null;
@@ -1339,6 +1375,23 @@
             document.getElementById('tplPreview').textContent = acc ? buildNotice(acc) : '계산 후 미리보기가 표시됩니다.';
         }
 
+        function loadTplInputs() {
+            const L = getNoticeLines();
+            document.querySelectorAll('.tpl-line').forEach(el => { el.value = L[el.dataset.line]; });
+        }
+
+        function saveTplInputs() {
+            const L = {};
+            document.querySelectorAll('.tpl-line').forEach(el => { L[el.dataset.line] = el.value; });
+            localStorage.setItem(NOTICE_KEY, JSON.stringify(L));
+            renderTplPreview();
+        }
+
+        document.querySelectorAll('.tpl-line').forEach(el => {
+            el.addEventListener('input', saveTplInputs);
+            el.addEventListener('focus', () => { tplLastFocused = el; });
+        });
+
         (function initTplVars() {
             const box = document.getElementById('tplVars');
             NOTICE_VARS.forEach(v => {
@@ -1346,13 +1399,15 @@
                 chip.type = 'button';
                 chip.className = 'text-xs bg-white border border-slate-300 hover:border-blue-400 hover:text-blue-600 rounded-full px-2.5 py-1 text-slate-600 transition';
                 chip.textContent = v;
-                chip.title = '커서 위치에 넣기';
+                chip.title = '선택한 문장 칸에 넣기';
                 chip.addEventListener('click', () => {
-                    const s = tplText.selectionStart, e = tplText.selectionEnd;
-                    tplText.value = tplText.value.slice(0, s) + v + tplText.value.slice(e);
-                    tplText.selectionStart = tplText.selectionEnd = s + v.length;
-                    tplText.focus();
-                    tplText.dispatchEvent(new Event('input'));
+                    const el = tplLastFocused || document.querySelector('.tpl-line');
+                    const s = el.selectionStart ?? el.value.length;
+                    const e = el.selectionEnd ?? el.value.length;
+                    el.value = el.value.slice(0, s) + v + el.value.slice(e);
+                    el.focus();
+                    el.selectionStart = el.selectionEnd = s + v.length;
+                    saveTplInputs();
                 });
                 box.appendChild(chip);
             });
@@ -1361,19 +1416,14 @@
         document.getElementById('tplBtn').addEventListener('click', () => {
             tplPanel.classList.toggle('hidden');
             if (!tplPanel.classList.contains('hidden')) {
-                tplText.value = getNoticeTemplate();
+                loadTplInputs();
                 renderTplPreview();
             }
         });
 
-        tplText.addEventListener('input', () => {
-            localStorage.setItem(NOTICE_KEY, tplText.value);
-            renderTplPreview();
-        });
-
         document.getElementById('tplReset').addEventListener('click', () => {
             localStorage.removeItem(NOTICE_KEY);
-            tplText.value = DEFAULT_NOTICE;
+            loadTplInputs();
             renderTplPreview();
         });
 
@@ -1550,8 +1600,7 @@
         });
 
         // ===== 백업 저장 / 불러오기 =====
-        const BACKUP_KEYS = ['settlementHistory', 'settleRateOverridesV2', 'recipientTitles', 'sentStatus', 'companyAliases', 'unnamedAccounts'];
-        const BACKUP_TEXT_KEYS = ['noticeTemplate'];   // 문자열로 저장되는 항목
+        const BACKUP_KEYS = ['settlementHistory', 'settleRateOverridesV2', 'recipientTitles', 'sentStatus', 'companyAliases', 'unnamedAccounts', 'noticeLines'];
 
         const LAST_BACKUP_KEY = 'lastBackupDate';
 
@@ -1570,7 +1619,6 @@
         function downloadBackup() {
             const backup = { app: '마케팅 정산 계산기', version: 1, exportedAt: new Date().toISOString(), data: {} };
             BACKUP_KEYS.forEach(k => { backup.data[k] = loadJSON(k); });
-            BACKUP_TEXT_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v !== null) backup.data[k] = v; });
             // 파일명은 영문으로 (일부 브라우저가 한글 파일명을 무시하고 'download'로 저장함)
             saveFile('settlement-backup-' + new Date().toISOString().slice(0, 10) + '.json',
                      new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
@@ -1616,9 +1664,6 @@
                         localStorage.setItem(k, JSON.stringify(backup.data[k]));
                         count++;
                     }
-                });
-                BACKUP_TEXT_KEYS.forEach(k => {
-                    if (typeof backup.data[k] === 'string') { localStorage.setItem(k, backup.data[k]); count++; }
                 });
                 if (count === 0) throw new Error('불러올 데이터가 없습니다.');
                 if (rowMeta.size > 0) renderRateTable(rowMeta);
