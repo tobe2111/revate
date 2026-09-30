@@ -164,11 +164,32 @@
                         </h2>
                         <div class="flex items-center gap-3">
                             <span id="sentCount" class="text-sm text-gray-500"></span>
+                            <button id="tplBtn"
+                                    class="text-sm text-gray-600 hover:text-blue-600 border border-gray-300 hover:border-blue-400 rounded px-3 py-1.5 transition">
+                                <i class="fas fa-pen-to-square mr-1"></i>안내문 문구
+                            </button>
                             <button id="csvBtn"
                                     class="text-sm text-gray-600 hover:text-blue-600 border border-gray-300 hover:border-blue-400 rounded px-3 py-1.5 transition">
                                 <i class="fas fa-download mr-1"></i>CSV 다운로드
                             </button>
                         </div>
+                    </div>
+
+                    <div id="tplPanel" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-sm font-medium text-slate-700">
+                                <i class="fas fa-message mr-1.5 text-blue-500"></i>안내문 문구 수정
+                            </p>
+                            <button id="tplReset" class="text-xs text-slate-400 hover:text-red-500 underline">기본 문구로 되돌리기</button>
+                        </div>
+                        <p class="text-xs text-slate-500 mb-2">
+                            아래 치환어를 넣으면 회사별 값으로 자동 채워집니다. 수정하면 바로 저장됩니다.
+                        </p>
+                        <div id="tplVars" class="flex flex-wrap gap-1.5 mb-2"></div>
+                        <textarea id="tplText" rows="8"
+                                  class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea>
+                        <p class="text-xs text-slate-400 mt-3 mb-1">미리보기 <span id="tplPreviewName" class="text-slate-500"></span></p>
+                        <pre id="tplPreview" class="whitespace-pre-wrap bg-white border border-slate-200 rounded-lg p-3 text-sm text-slate-700"></pre>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -1236,6 +1257,7 @@
             if (data.accounts.length > 0) showDetails(data.accounts[0]);
             lastResults = data;
             updateSentCount();
+            if (!tplPanel.classList.contains('hidden')) renderTplPreview();
         }
 
         // ===== CSV 다운로드 =====
@@ -1269,18 +1291,91 @@
         }
 
         // ===== 정산 안내문 생성 (카톡 발송용) =====
+        const NOTICE_KEY = 'noticeTemplate';
+        const DEFAULT_NOTICE =
+            '안녕하세요 {호칭}, 좋은 아침입니다!\n\n' +
+            '{월} 정산 진행 도와드리겠습니다. 세금계산서로 진행 도와드리는 형태로 페이백 비용은 부가세 포함 {지급액}원 입니다.\n' +
+            '(공급가 {정산액}원 + 부가세 {부가세}원)\n\n' +
+            '세금계산서 처리 해주시면 월말 정산 도와드리겠습니다 :)';
+
+        const NOTICE_VARS = ['{고객사}', '{호칭}', '{월}', '{광고비}', '{정산액}', '{부가세}', '{지급액}'];
+
+        function getNoticeTemplate() {
+            const t = localStorage.getItem(NOTICE_KEY);
+            return (t === null || t === '') ? DEFAULT_NOTICE : t;
+        }
+
         function buildNotice(acc) {
             const month = document.getElementById('settleMonth').value;
             const monthLabel = month ? parseInt(month.split('-')[1], 10) + '월' : '이번 달';
             const supply = Math.floor(acc.totalSettlement);
             const vat = Math.floor(acc.totalSettlement * 0.1);
             const total = supply + vat;
-            return `안녕하세요 ${getTitle(acc.accountName)}, 좋은 아침입니다!\n\n` +
-                `${monthLabel} 정산 진행 도와드리겠습니다. ` +
-                `세금계산서로 진행 도와드리는 형태로 페이백 비용은 부가세 포함 ${total.toLocaleString('ko-KR')}원 입니다.\n` +
-                `(공급가 ${supply.toLocaleString('ko-KR')}원 + 부가세 ${vat.toLocaleString('ko-KR')}원)\n\n` +
-                `세금계산서 처리 해주시면 월말 정산 도와드리겠습니다 :)`;
+            const won = n => Math.floor(n).toLocaleString('ko-KR');
+
+            const values = {
+                '{고객사}': acc.accountName,
+                '{호칭}': getTitle(acc.accountName),
+                '{월}': monthLabel,
+                '{광고비}': won(acc.totalAmount),
+                '{정산액}': won(supply),
+                '{부가세}': won(vat),
+                '{지급액}': won(total)
+            };
+            return getNoticeTemplate().replace(/\{[^}]+\}/g, m => (m in values ? values[m] : m));
         }
+
+        // ----- 안내문 문구 편집 -----
+        const tplPanel = document.getElementById('tplPanel');
+        const tplText = document.getElementById('tplText');
+
+        function tplPreviewAccount() {
+            return (lastResults && lastResults.accounts[0]) || null;
+        }
+
+        function renderTplPreview() {
+            const acc = tplPreviewAccount();
+            document.getElementById('tplPreviewName').textContent = acc ? '(' + acc.accountName + ' 기준)' : '';
+            document.getElementById('tplPreview').textContent = acc ? buildNotice(acc) : '계산 후 미리보기가 표시됩니다.';
+        }
+
+        (function initTplVars() {
+            const box = document.getElementById('tplVars');
+            NOTICE_VARS.forEach(v => {
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'text-xs bg-white border border-slate-300 hover:border-blue-400 hover:text-blue-600 rounded-full px-2.5 py-1 text-slate-600 transition';
+                chip.textContent = v;
+                chip.title = '커서 위치에 넣기';
+                chip.addEventListener('click', () => {
+                    const s = tplText.selectionStart, e = tplText.selectionEnd;
+                    tplText.value = tplText.value.slice(0, s) + v + tplText.value.slice(e);
+                    tplText.selectionStart = tplText.selectionEnd = s + v.length;
+                    tplText.focus();
+                    tplText.dispatchEvent(new Event('input'));
+                });
+                box.appendChild(chip);
+            });
+        })();
+
+        document.getElementById('tplBtn').addEventListener('click', () => {
+            tplPanel.classList.toggle('hidden');
+            if (!tplPanel.classList.contains('hidden')) {
+                tplText.value = getNoticeTemplate();
+                renderTplPreview();
+            }
+        });
+
+        tplText.addEventListener('input', () => {
+            localStorage.setItem(NOTICE_KEY, tplText.value);
+            renderTplPreview();
+        });
+
+        document.getElementById('tplReset').addEventListener('click', () => {
+            localStorage.removeItem(NOTICE_KEY);
+            tplText.value = DEFAULT_NOTICE;
+            renderTplPreview();
+        });
 
         // ===== 진행 상태 (월별 / 고객사별, 브라우저 저장) =====
         // 미발송(none) → 안내 발송(sent) → 계산서 수령(invoiced), 클릭할 때마다 순환
@@ -1456,6 +1551,7 @@
 
         // ===== 백업 저장 / 불러오기 =====
         const BACKUP_KEYS = ['settlementHistory', 'settleRateOverridesV2', 'recipientTitles', 'sentStatus', 'companyAliases', 'unnamedAccounts'];
+        const BACKUP_TEXT_KEYS = ['noticeTemplate'];   // 문자열로 저장되는 항목
 
         const LAST_BACKUP_KEY = 'lastBackupDate';
 
@@ -1474,6 +1570,7 @@
         function downloadBackup() {
             const backup = { app: '마케팅 정산 계산기', version: 1, exportedAt: new Date().toISOString(), data: {} };
             BACKUP_KEYS.forEach(k => { backup.data[k] = loadJSON(k); });
+            BACKUP_TEXT_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v !== null) backup.data[k] = v; });
             // 파일명은 영문으로 (일부 브라우저가 한글 파일명을 무시하고 'download'로 저장함)
             saveFile('settlement-backup-' + new Date().toISOString().slice(0, 10) + '.json',
                      new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
@@ -1519,6 +1616,9 @@
                         localStorage.setItem(k, JSON.stringify(backup.data[k]));
                         count++;
                     }
+                });
+                BACKUP_TEXT_KEYS.forEach(k => {
+                    if (typeof backup.data[k] === 'string') { localStorage.setItem(k, backup.data[k]); count++; }
                 });
                 if (count === 0) throw new Error('불러올 데이터가 없습니다.');
                 if (rowMeta.size > 0) renderRateTable(rowMeta);
