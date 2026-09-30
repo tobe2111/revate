@@ -790,6 +790,56 @@
                 : 'text-xs text-gray-400 hover:text-blue-600 underline whitespace-nowrap';
         }
 
+        // 대표 회사가 바뀌면 그 이름으로 저장돼 있던 정산율 예외 / 호칭 / 진행 상태도 함께 옮김
+        function migrateAccountName(from, to) {
+            if (!from || !to || from === to) return;
+
+            const ov = loadJSON(OVERRIDE_KEY);
+            let changed = false;
+            Object.keys(ov).forEach(k => {
+                const at = k.lastIndexOf('@');
+                if (at > 0 && k.slice(0, at) === from) {
+                    ov[to + k.slice(at)] = ov[k];
+                    delete ov[k];
+                    changed = true;
+                }
+            });
+            if (changed) localStorage.setItem(OVERRIDE_KEY, JSON.stringify(ov));
+
+            const titles = loadJSON(TITLE_KEY);
+            if (titles[from] !== undefined) {
+                if (titles[to] === undefined) titles[to] = titles[from];
+                delete titles[from];
+                localStorage.setItem(TITLE_KEY, JSON.stringify(titles));
+            }
+
+            const sent = loadJSON(SENT_KEY);
+            let sentChanged = false;
+            Object.values(sent).forEach(monthMap => {
+                if (monthMap && monthMap[from] !== undefined) {
+                    if (monthMap[to] === undefined) monthMap[to] = monthMap[from];
+                    delete monthMap[from];
+                    sentChanged = true;
+                }
+            });
+            if (sentChanged) localStorage.setItem(SENT_KEY, JSON.stringify(sent));
+        }
+
+        // 묶음의 대표 회사를 변경 (기존 소속 회사 중 하나 또는 직접 입력한 이름)
+        function setGroupRepresentative(oldTarget, newTarget) {
+            newTarget = String(newTarget || '').trim();
+            if (!newTarget || newTarget === oldTarget) return;
+
+            const map = loadJSON(ALIAS_KEY);
+            const members = [oldTarget, ...Object.keys(map).filter(k => map[k] === oldTarget)];
+            members.forEach(m => { delete map[m]; });
+            members.forEach(m => { if (m !== newTarget) map[m] = newTarget; });
+            localStorage.setItem(ALIAS_KEY, JSON.stringify(map));
+
+            migrateAccountName(oldTarget, newTarget);
+            reprocessAfterMerge();
+        }
+
         function refreshMergeUI() {
             const companies = [...rowMeta.keys()].sort();
             const groups = mergeGroups();
@@ -850,10 +900,41 @@
                 const title = document.createElement('div');
                 title.className = 'flex items-center justify-between gap-2 mb-2';
 
-                const name = document.createElement('span');
-                name.className = 'text-sm font-semibold text-slate-800 truncate';
-                name.innerHTML = '<i class="fas fa-building mr-1.5 text-blue-500"></i>' + escapeHtml(to) +
-                    '<span class="ml-2 text-xs font-normal text-slate-400">계정 ' + (froms.length + 1) + '개</span>';
+                const name = document.createElement('div');
+                name.className = 'flex items-center gap-1.5 min-w-0';
+
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-building text-blue-500 shrink-0';
+
+                const repLabel = document.createElement('span');
+                repLabel.className = 'text-xs text-slate-400 shrink-0';
+                repLabel.textContent = '대표';
+
+                // 대표 회사 변경 드롭다운
+                const repSel = document.createElement('select');
+                repSel.className = 'border border-slate-300 rounded-lg px-2 py-1 text-sm font-semibold text-slate-800 bg-white max-w-[13rem] focus:outline-none focus:ring-2 focus:ring-blue-400';
+                repSel.title = '대표 회사 변경 (안내문·정산 결과에 이 이름으로 표시됩니다)';
+                [to, ...froms].forEach(n => repSel.appendChild(new Option(n, n)));
+                repSel.appendChild(new Option('직접 입력…', '__custom__'));
+                repSel.value = to;
+                repSel.addEventListener('change', () => {
+                    if (repSel.value === '__custom__') {
+                        const typed = prompt('대표 회사 이름을 입력하세요.', to);
+                        repSel.value = to;
+                        if (typed && typed.trim() && typed.trim() !== to) setGroupRepresentative(to, typed.trim());
+                        return;
+                    }
+                    setGroupRepresentative(to, repSel.value);
+                });
+
+                const cntLabel = document.createElement('span');
+                cntLabel.className = 'text-xs text-slate-400 shrink-0 whitespace-nowrap';
+                cntLabel.textContent = '계정 ' + (froms.length + 1) + '개';
+
+                name.appendChild(icon);
+                name.appendChild(repLabel);
+                name.appendChild(repSel);
+                name.appendChild(cntLabel);
 
                 const btns = document.createElement('div');
                 btns.className = 'flex items-center gap-2 shrink-0';
@@ -888,7 +969,7 @@
                 // 대표 이름도 칩으로 함께 보여주기 (어떤 회사들이 묶였는지 한눈에)
                 const main = document.createElement('span');
                 main.className = 'inline-flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-1 text-xs text-blue-700 font-medium';
-                main.textContent = to + ' (대표)';
+                main.textContent = to + ' · 대표';
                 chips.appendChild(main);
 
                 froms.forEach(f => {
