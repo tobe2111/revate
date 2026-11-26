@@ -1,0 +1,52 @@
+name: 제휴 제안 메일 자동 발송
+
+on:
+  schedule:
+    - cron: "50 23 * * *"   # 매일 한국시간 08:50 (UTC 23:50)
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "send = 실제 발송 / dry-run = 대상만 확인 / test = 보고 주소로 1통만"
+        required: true
+        default: dry-run
+        type: choice
+        options: [dry-run, test, send]
+
+permissions:
+  contents: read
+  actions: write   # 60일 무활동 시 예약이 꺼지는 것 방지용
+
+concurrency:
+  group: outreach-mail
+  cancel-in-progress: false
+
+jobs:
+  send:
+    if: github.repository == 'tobe2111/revate'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: outreach
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 발송 실행
+        env:
+          MODE: ${{ github.event_name == 'schedule' && 'send' || inputs.mode }}
+          DAILY_LIMIT: ${{ vars.DAILY_LIMIT }}
+          SHEET_API_URL: ${{ secrets.SHEET_API_URL }}
+          SHEET_API_TOKEN: ${{ secrets.SHEET_API_TOKEN }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          REPORT_TO: ${{ secrets.REPORT_TO }}
+        run: python outreach/send.py
+
+      - name: 예약 유지 (60일 무활동 꺼짐 방지)
+        if: always() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/outreach.yml/enable" || true
