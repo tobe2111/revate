@@ -159,7 +159,15 @@ class Mailer:
 
     def connect(self) -> None:
         self.close()
-        self.smtp = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ssl.create_default_context(), timeout=60)
+        for attempt in range(4):
+            try:
+                self.smtp = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ssl.create_default_context(), timeout=60)
+                break
+            except (TimeoutError, OSError) as e:
+                if attempt == 3:
+                    raise
+                log(f"메일 서버 접속 재시도({attempt + 1}): {type(e).__name__}")
+                time.sleep(20 * (attempt + 1))
         self.smtp.login(self.user, self.password)
         self.count = 0
 
