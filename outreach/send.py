@@ -187,7 +187,14 @@ def is_fatal(err: Exception) -> bool:
     s = str(err).lower()
     if isinstance(err, smtplib.SMTPAuthenticationError):
         return True
-    return any(k in s for k in ("quota", "limit", "exceed", "too many", "rate", "spam", "blocked", "421", "454", "550 5.7"))
+    return is_sender_auth_error(err) or any(
+        k in s for k in ("quota", "limit", "exceed", "too many", "rate", "spam", "blocked", "421", "454"))
+
+
+def is_sender_auth_error(err: Exception) -> bool:
+    """보내는 도메인 인증(SPF/DKIM/DMARC) 문제 — 받는 업체 탓이 아니므로 즉시 중단하고 기록하지 않음."""
+    s = str(err).lower()
+    return any(k in s for k in ("5.7.26", "5.7.25", "5.7.27", "unauthenticated", "spf", "dkim", "dmarc"))
 
 
 # ───────── 수신거부·반송 찾기 (다음 메일함) ─────────
@@ -322,7 +329,8 @@ def main() -> None:
             if is_fatal(e):
                 # 한도·인증 문제: 이 업체는 기록하지 않음(다음 날 다시 보냄)
                 log(f"{i}번째에서 서버 오류: {type(e).__name__} {str(e)[:120]}")
-                if consecutive >= MAX_CONSECUTIVE_ERRORS or isinstance(e, smtplib.SMTPAuthenticationError):
+                if (consecutive >= MAX_CONSECUTIVE_ERRORS or isinstance(e, smtplib.SMTPAuthenticationError)
+                        or is_sender_auth_error(e)):
                     stop_reason = f"메일 서버 한도/인증 오류로 중단: {str(e)[:200]}"
                     break
                 mailer.close()
