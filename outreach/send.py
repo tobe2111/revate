@@ -14,7 +14,7 @@ GitHub Actions 가 매일 아침 실행합니다.
   SMTP_PASS        다음 메일 앱 비밀번호
   REPORT_TO        결과 보고를 받을 주소
 선택
-  MODE             send(기본) | dry-run(대상만 확인) | test(REPORT_TO 로 1통만)
+  MODE             send(기본) | dry-run(대상만 확인) | test(REPORT_TO 로 3통, 서버 확인용)
   DAILY_LIMIT      숫자를 넣으면 아래 일정 대신 이 값 사용
 
 공개 저장소이므로 로그에는 받는 사람 주소·업체명을 남기지 않습니다(개수만).
@@ -287,10 +287,25 @@ def main() -> None:
     today = dt.datetime.now(KST).date()
 
     if mode == "test":
-        mailer = Mailer(smtp_user, smtp_pass)
-        mailer.send(build_message(report_to, html, text, banner), report_to)
-        mailer.close()
-        log("테스트 메일 1통 발송 완료 (REPORT_TO 로). 시트에는 기록하지 않았습니다.")
+        # 다음 메일 서버는 여러 대라서, 매번 새로 접속해 3통을 보내 서버가 바뀌어도 통과하는지 확인
+        results = []
+        for n in range(1, 4):
+            mailer = Mailer(smtp_user, smtp_pass)
+            try:
+                mailer.send(build_message(report_to, html, text, banner), report_to)
+                results.append(f"{n}번째: 성공")
+            except Exception as e:  # noqa: BLE001
+                ip = re.search(r"ip: \[([0-9.]+)\]", str(e))
+                results.append(f"{n}번째: 실패 ({type(e).__name__}{' / 서버 ' + ip.group(1) if ip else ''}) {str(e)[:160]}")
+            finally:
+                mailer.close()
+            if n < 3:
+                time.sleep(15)
+        for r in results:
+            log(r)
+        log("테스트 메일은 REPORT_TO 로만 보냈고, 시트에는 기록하지 않았습니다.")
+        if any("실패" in r for r in results):
+            sys.exit(1)
         return
 
     sheet = Sheet(env("SHEET_API_URL"), env("SHEET_API_TOKEN"))

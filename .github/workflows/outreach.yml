@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "send = 실제 발송 / dry-run = 대상만 확인 / test = 보고 주소로 1통만"
+        description: "send = 실제 발송 / dry-run = 대상만 확인 / test = 보고 주소로 3통(서버 확인용)"
         required: true
         default: dry-run
         type: choice
