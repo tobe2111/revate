@@ -4,9 +4,10 @@ on:
   schedule:
     # GitHub 예약은 가끔 늦거나 건너뛰므로 3번 걸어 둠.
     # 그날 먼저 성공한 1번만 실제로 보내고, 나머지는 "오늘 이미 보냄"으로 건너뜀.
-    - cron: "50 23 * * *"   # 한국시간 08:50
-    - cron: "35 0 * * *"    # 한국시간 09:35 (예비)
-    - cron: "35 1 * * *"    # 한국시간 10:35 (예비)
+    # 평일(한국 월~금)만. UTC 기준이라 08:50 은 전날(일~목) 23:50.
+    - cron: "50 23 * * 0-4"   # 한국시간 08:50
+    - cron: "35 0 * * 1-5"    # 한국시간 09:35 (예비)
+    - cron: "35 1 * * 1-5"    # 한국시간 10:35 (예비)
   workflow_dispatch:
     inputs:
       mode:
@@ -63,6 +64,7 @@ jobs:
         id: run
         if: steps.done.outputs.cache-hit != 'true'
         env:
+          TRIGGER: ${{ github.event_name }}
           DAILY_LIMIT: ${{ vars.DAILY_LIMIT }}
           SHEET_API_URL: ${{ secrets.SHEET_API_URL }}
           SHEET_API_TOKEN: ${{ secrets.SHEET_API_TOKEN }}

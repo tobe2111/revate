@@ -54,9 +54,17 @@ IMAP_HOST, IMAP_PORT = "imap.daum.net", 993
 
 # 날짜별 하루 발송 수 (한국 날짜 기준, 위에서부터 처음 맞는 줄 사용)
 SCHEDULE = [
-    ("2026-12-03", 150),   # 이 날짜까지(포함) 150통
-    ("9999-12-31", 500),   # 그 뒤로 500통
+    ("2026-12-04", 150),   # 첫 주(11/30 월 ~ 12/4 금)까지 150통
+    ("9999-12-31", 500),   # 12/7(월)부터 500통
 ]
+
+# 자동 예약 실행은 평일(월~금)에만. 아래 날짜도 쉼 (공휴일·쉬고 싶은 날을 "YYYY-MM-DD" 로 추가)
+OFF_DATES = {
+    "2026-11-27",  # 요청: 이날은 보내지 않음
+    "2026-12-25",  # 성탄절
+    "2027-01-01",  # 신정
+    "2027-03-01",  # 삼일절
+}
 
 DELAY_RANGE = (4.0, 8.0)        # 메일 사이 쉬는 시간(초) — 한꺼번에 몰리지 않게
 RECORD_EVERY = 10               # 몇 통마다 시트에 기록할지
@@ -281,6 +289,11 @@ def scan_mailbox(user: str, password: str) -> list[dict]:
 # ───────── 실행 ─────────
 def main() -> None:
     mode = env("MODE", required=False, default="send").lower()
+    today_kst = dt.datetime.now(KST).date()
+    if mode == "send" and os.environ.get("TRIGGER") == "schedule" and (
+            today_kst.weekday() >= 5 or today_kst.isoformat() in OFF_DATES):
+        log(f"오늘({today_kst})은 주말/쉬는 날이라 자동 발송을 하지 않습니다.")
+        return
     smtp_user, smtp_pass = env("SMTP_USER"), env("SMTP_PASS")
     report_to = env("REPORT_TO")
     html = (HERE / "template.html").read_text(encoding="utf-8")
