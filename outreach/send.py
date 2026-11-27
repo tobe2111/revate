@@ -131,6 +131,8 @@ def html_to_text(html: str) -> str:
     t = re.sub(r"(?i)<li[^>]*>", "· ", t)
     t = re.sub(r"<[^>]+>", "", t)
     t = t.replace("&amp;", "&").replace("&nbsp;", " ")
+    # 주소 끝을 분명히 해서, 줄바꿈을 지우는 메일 프로그램·보안 검사기가 뒤 글자(=== 등)를 주소에 붙이지 않게 함
+    t = re.sub(r"(https?://[^\s<>]+)", r"<\1>", t)
     return re.sub(r"\n{3,}", "\n\n", t).strip()
 
 
