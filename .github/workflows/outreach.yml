@@ -2,7 +2,11 @@ name: 제휴 제안 메일 자동 발송
 
 on:
   schedule:
-    - cron: "50 23 * * *"   # 매일 한국시간 08:50 (UTC 23:50)
+    # GitHub 예약은 가끔 늦거나 건너뛰므로 3번 걸어 둠.
+    # 그날 먼저 성공한 1번만 실제로 보내고, 나머지는 "오늘 이미 보냄"으로 건너뜀.
+    - cron: "50 23 * * *"   # 한국시간 08:50
+    - cron: "35 0 * * *"    # 한국시간 09:35 (예비)
+    - cron: "35 1 * * *"    # 한국시간 10:35 (예비)
   workflow_dispatch:
     inputs:
       mode:
@@ -14,7 +18,7 @@ on:
 
 permissions:
   contents: read
-  actions: write   # 60일 무활동 시 예약이 꺼지는 것 방지용
+  actions: write   # 60일 무활동 시 예약이 꺼지는 것 방지 + 하루 1회 표시(캐시)용
 
 concurrency:
   group: outreach-mail
@@ -25,18 +29,40 @@ jobs:
     if: github.repository == 'tobe2111/revate'
     runs-on: ubuntu-latest
     timeout-minutes: 300
+    env:
+      MODE: ${{ github.event_name == 'schedule' && 'send' || inputs.mode }}
     steps:
+      - name: 오늘 날짜(한국시간)
+        id: day
+        run: echo "date=$(TZ=Asia/Seoul date +%F)" >> "$GITHUB_OUTPUT"
+
+      - name: 오늘 이미 보냈는지 확인
+        id: done
+        if: env.MODE == 'send'
+        uses: actions/cache/restore@v4
+        with:
+          path: .sent-marker
+          key: outreach-sent-${{ steps.day.outputs.date }}
+          lookup-only: true
+
+      - name: 오늘은 이미 보냄 → 건너뜀
+        if: env.MODE == 'send' && steps.done.outputs.cache-hit == 'true'
+        run: echo "오늘(${{ steps.day.outputs.date }})은 이미 발송했습니다. 이번 실행은 건너뜁니다." >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/checkout@v4
+        if: steps.done.outputs.cache-hit != 'true'
         with:
           sparse-checkout: outreach
 
       - uses: actions/setup-python@v5
+        if: steps.done.outputs.cache-hit != 'true'
         with:
           python-version: "3.12"
 
       - name: 발송 실행
+        id: run
+        if: steps.done.outputs.cache-hit != 'true'
         env:
-          MODE: ${{ github.event_name == 'schedule' && 'send' || inputs.mode }}
           DAILY_LIMIT: ${{ vars.DAILY_LIMIT }}
           SHEET_API_URL: ${{ secrets.SHEET_API_URL }}
           SHEET_API_TOKEN: ${{ secrets.SHEET_API_TOKEN }}
@@ -44,6 +70,17 @@ jobs:
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           REPORT_TO: ${{ secrets.REPORT_TO }}
         run: python outreach/send.py
+
+      - name: 오늘 보냄 표시
+        if: env.MODE == 'send' && steps.run.outcome == 'success'
+        run: echo "${{ steps.day.outputs.date }}" > .sent-marker
+
+      - name: 오늘 보냄 표시 저장
+        if: env.MODE == 'send' && steps.run.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: .sent-marker
+          key: outreach-sent-${{ steps.day.outputs.date }}
 
       - name: 예약 유지 (60일 무활동 꺼짐 방지)
         if: always() && github.event_name == 'schedule'
