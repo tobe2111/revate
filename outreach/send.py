@@ -205,6 +205,9 @@ def is_fatal(err: Exception) -> bool:
     s = str(err).lower()
     if isinstance(err, smtplib.SMTPAuthenticationError):
         return True
+    # 받는 쪽 회사 메일 서버가 없거나 주소가 없는 경우 → 그 업체만 실패로 기록하고 계속
+    if any(k in s for k in ("4.4.4", "mx host", "5.1.1", "no such user", "user unknown", "does not exist")):
+        return False
     return is_sender_auth_error(err) or any(
         k in s for k in ("quota", "limit", "exceed", "too many", "rate", "spam", "blocked", "421", "454"))
 
@@ -213,6 +216,65 @@ def is_sender_auth_error(err: Exception) -> bool:
     """보내는 도메인 인증(SPF/DKIM/DMARC) 문제 — 받는 업체 탓이 아니므로 즉시 중단하고 기록하지 않음."""
     s = str(err).lower()
     return any(k in s for k in ("5.7.26", "5.7.25", "5.7.27", "unauthenticated", "spf", "dkim", "dmarc"))
+
+
+# ───────── 보낸메일함에 사본 저장 (다음 메일함) ─────────
+class SentCopier:
+    """SMTP로 바로 보내면 다음 '보낸메일함'에 안 남으므로, 보낸 메일 사본을 IMAP으로 넣어 둠(실패해도 발송엔 영향 없음)."""
+
+    NAMES = ("Sent Messages", "보낸편지함", "보낸메일함", "Sent", "SENT")
+
+    def __init__(self, user: str, password: str):
+        self.user, self.password = user, password
+        self.imap: imaplib.IMAP4_SSL | None = None
+        self.folder: str | None = None
+        self.fails = 0
+        self.saved = 0
+
+    def _open(self) -> None:
+        self.imap = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT)
+        self.imap.login(self.user, self.password)
+        if self.folder:
+            return
+        typ, data = self.imap.list()
+        names = []
+        for raw in data or []:
+            line = raw.decode("utf-8", "replace") if isinstance(raw, bytes) else str(raw)
+            m = re.search(r'\(([^)]*)\) "[^"]*" (.+)$', line)
+            if not m:
+                continue
+            flags, name = m.group(1), m.group(2).strip().strip('"')
+            if "\\Sent" in flags:
+                self.folder = name
+                return
+            names.append(name)
+        for n in self.NAMES:
+            if n in names:
+                self.folder = n
+                return
+        raise RuntimeError("보낸메일함 폴더를 찾지 못함")
+
+    def save(self, msg: EmailMessage) -> None:
+        if self.fails >= 3:
+            return
+        try:
+            if self.imap is None:
+                self._open()
+            folder = self.folder if " " not in self.folder else f'"{self.folder}"'
+            self.imap.append(folder, "(\\Seen)", imaplib.Time2Internaldate(time.time()), msg.as_bytes())
+            self.saved += 1
+        except Exception as e:  # noqa: BLE001
+            self.fails += 1
+            log(f"보낸메일함 사본 저장 실패({self.fails}/3, 발송은 정상): {type(e).__name__}")
+            self.close()
+
+    def close(self) -> None:
+        if self.imap:
+            try:
+                self.imap.logout()
+            except Exception:  # noqa: BLE001
+                pass
+        self.imap = None
 
 
 # ───────── 수신거부·반송 찾기 (다음 메일함) ─────────
@@ -304,10 +366,13 @@ def main() -> None:
     if mode == "test":
         # 다음 메일 서버는 여러 대라서, 매번 새로 접속해 3통을 보내 서버가 바뀌어도 통과하는지 확인
         results = []
+        test_copier = SentCopier(smtp_user, smtp_pass)
         for n in range(1, 4):
             mailer = Mailer(smtp_user, smtp_pass)
             try:
-                mailer.send(build_message(report_to, html, text, banner), report_to)
+                tmsg = build_message(report_to, html, text, banner)
+                mailer.send(tmsg, report_to)
+                test_copier.save(tmsg)
                 results.append(f"{n}번째: 성공")
             except Exception as e:  # noqa: BLE001
                 ip = re.search(r"ip: \[([0-9.]+)\]", str(e))
@@ -316,6 +381,8 @@ def main() -> None:
                 mailer.close()
             if n < 3:
                 time.sleep(15)
+        test_copier.close()
+        results.append(f"보낸메일함 사본 저장: {test_copier.saved}통 (폴더: {test_copier.folder or '못 찾음'})")
         for r in results:
             log(r)
         log("테스트 메일은 REPORT_TO 로만 보냈고, 시트에는 기록하지 않았습니다.")
@@ -349,6 +416,7 @@ def main() -> None:
 
     # 3) 1통씩 발송
     mailer = Mailer(smtp_user, smtp_pass)
+    copier = SentCopier(smtp_user, smtp_pass)
     started = time.time()
     pending: list[dict] = []
     ok = fail = 0
@@ -357,7 +425,9 @@ def main() -> None:
     for i, t in enumerate(targets, 1):
         ts = dt.datetime.now(KST).strftime("%Y-%m-%d %H:%M")
         try:
-            mailer.send(build_message(t["email"], html, text, banner), t["email"])
+            msg = build_message(t["email"], html, text, banner)
+            mailer.send(msg, t["email"])
+            copier.save(msg)
             pending.append({**t, "ts": ts, "result": "보냄", "ok": True})
             ok += 1
             consecutive = 0
@@ -388,6 +458,8 @@ def main() -> None:
             time.sleep(random.uniform(*DELAY_RANGE))
     sheet.record(pending)
     mailer.close()
+    copier.close()
+    log(f"보낸메일함 사본 저장: {copier.saved}통 (폴더: {copier.folder or '못 찾음'})")
 
     minutes = (time.time() - started) / 60
     left = max(remaining - ok - fail, 0)
